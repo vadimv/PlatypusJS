@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.server.websocket.WebSocketClientSession");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.server.websocket.WebSocketClientSession";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.WebSocket(null, aDelegate);
     });
     
@@ -16,6 +18,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -26,10 +29,10 @@
         Object.defineProperty(this, "onmessage", {
             get: function() {
                 var value = delegate.onmessage;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onmessage = P.boxAsJava(aValue);
+                delegate.onmessage = aValue;
             }
         });
         if(!P.WebSocket){
@@ -43,10 +46,10 @@
         Object.defineProperty(this, "onerror", {
             get: function() {
                 var value = delegate.onerror;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onerror = P.boxAsJava(aValue);
+                delegate.onerror = aValue;
             }
         });
         if(!P.WebSocket){
@@ -60,10 +63,10 @@
         Object.defineProperty(this, "onopen", {
             get: function() {
                 var value = delegate.onopen;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onopen = P.boxAsJava(aValue);
+                delegate.onopen = aValue;
             }
         });
         if(!P.WebSocket){
@@ -91,10 +94,10 @@
         Object.defineProperty(this, "onclose", {
             get: function() {
                 var value = delegate.onclose;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onclose = P.boxAsJava(aValue);
+                delegate.onclose = aValue;
             }
         });
         if(!P.WebSocket){

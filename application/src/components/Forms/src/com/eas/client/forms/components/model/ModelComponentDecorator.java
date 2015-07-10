@@ -4,7 +4,6 @@
  */
 package com.eas.client.forms.components.model;
 
-import com.bearsoft.rowset.RowsetConverter;
 import com.eas.client.forms.ModelCellEditingListener;
 import com.eas.client.forms.Forms;
 import com.eas.client.forms.HasComponentEvents;
@@ -22,6 +21,7 @@ import com.eas.design.Undesignable;
 import com.eas.script.AlreadyPublishedException;
 import com.eas.script.EventMethod;
 import com.eas.script.ScriptFunction;
+import com.eas.script.Scripts;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -70,7 +70,7 @@ import javax.swing.event.CellEditorListener;
 import javax.swing.event.ChangeEvent;
 import jdk.nashorn.api.scripting.AbstractJSObject;
 import jdk.nashorn.api.scripting.JSObject;
-import jdk.nashorn.internal.runtime.Undefined;
+import jdk.nashorn.internal.runtime.JSType;
 
 /**
  *
@@ -82,7 +82,6 @@ public abstract class ModelComponentDecorator<D extends JComponent, V> extends J
 
     public static final int EXTRA_BUTTON_WIDTH = 18;
 
-    protected static RowsetConverter converter = new RowsetConverter();
     protected JTextField prefSizeCalculator = new JTextField();// DON't move to design!!!
     protected JLabel iconLabel = new JLabel(" ");
     protected JToolBar extraTools = new JToolBar();
@@ -667,8 +666,8 @@ public abstract class ModelComponentDecorator<D extends JComponent, V> extends J
     protected boolean settingValueToJs;
 
     protected void bind() {
-        if (data != null && field != null && !field.isEmpty() && com.eas.script.ScriptUtils.isInitialized()) {
-            boundToData = com.eas.script.ScriptUtils.listen(data, field, new AbstractJSObject() {
+        if (data != null && field != null && !field.isEmpty() && Scripts.isInitialized()) {
+            boundToData = Scripts.getSpace().listen(data, field, new AbstractJSObject() {
 
                 @Override
                 public Object call(Object thiz, Object... args) {
@@ -676,7 +675,7 @@ public abstract class ModelComponentDecorator<D extends JComponent, V> extends J
                         settingValueFromJs = true;
                         try {
                             Object newValue = ModelWidget.getPathData(data, field);
-                            setJsValue(newValue instanceof Undefined ? null : newValue);
+                            setJsValue(JSType.nullOrUndefined(newValue) ? null : newValue);
                         } finally {
                             settingValueFromJs = false;
                         }
@@ -691,7 +690,7 @@ public abstract class ModelComponentDecorator<D extends JComponent, V> extends J
                 if (!settingValueFromJs) {
                     settingValueToJs = true;
                     try {
-                        ModelWidget.setPathData(data, field, com.eas.script.ScriptUtils.toJs(evt.getNewValue()));
+                        ModelWidget.setPathData(data, field, Scripts.getSpace().toJs(evt.getNewValue()));
                     } finally {
                         settingValueToJs = false;
                     }
@@ -703,8 +702,7 @@ public abstract class ModelComponentDecorator<D extends JComponent, V> extends J
 
     protected void unbind() {
         if (boundToData != null) {
-            JSObject unlisten = (JSObject) boundToData.getMember("unlisten");
-            unlisten.call(null, new Object[]{});
+            Scripts.unlisten(boundToData);
             boundToData = null;
         }
         if (boundToValue != null) {
@@ -782,7 +780,7 @@ public abstract class ModelComponentDecorator<D extends JComponent, V> extends J
 
     @Override
     public Object getJsValue() {
-        return com.eas.script.ScriptUtils.toJs(getValue());
+        return Scripts.getSpace().toJs(getValue());
     }
 
     @Override

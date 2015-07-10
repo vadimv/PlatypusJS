@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.forms.Form");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.forms.Form";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.Form(null, null, aDelegate);
     });
     
@@ -19,6 +21,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -29,10 +32,10 @@
         Object.defineProperty(this, "onWindowOpened", {
             get: function() {
                 var value = delegate.onWindowOpened;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowOpened = P.boxAsJava(aValue);
+                delegate.onWindowOpened = aValue;
             }
         });
         if(!P.Form){
@@ -111,10 +114,10 @@
         Object.defineProperty(this, "onWindowMinimized", {
             get: function() {
                 var value = delegate.onWindowMinimized;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowMinimized = P.boxAsJava(aValue);
+                delegate.onWindowMinimized = aValue;
             }
         });
         if(!P.Form){
@@ -145,10 +148,10 @@
         Object.defineProperty(this, "onWindowDeactivated", {
             get: function() {
                 var value = delegate.onWindowDeactivated;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowDeactivated = P.boxAsJava(aValue);
+                delegate.onWindowDeactivated = aValue;
             }
         });
         if(!P.Form){
@@ -197,10 +200,10 @@
         Object.defineProperty(this, "onWindowActivated", {
             get: function() {
                 var value = delegate.onWindowActivated;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowActivated = P.boxAsJava(aValue);
+                delegate.onWindowActivated = aValue;
             }
         });
         if(!P.Form){
@@ -245,10 +248,10 @@
         Object.defineProperty(this, "onWindowMaximized", {
             get: function() {
                 var value = delegate.onWindowMaximized;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowMaximized = P.boxAsJava(aValue);
+                delegate.onWindowMaximized = aValue;
             }
         });
         if(!P.Form){
@@ -296,10 +299,10 @@
         Object.defineProperty(this, "onWindowRestored", {
             get: function() {
                 var value = delegate.onWindowRestored;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowRestored = P.boxAsJava(aValue);
+                delegate.onWindowRestored = aValue;
             }
         });
         if(!P.Form){
@@ -327,10 +330,10 @@
         Object.defineProperty(this, "onWindowClosed", {
             get: function() {
                 var value = delegate.onWindowClosed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowClosed = P.boxAsJava(aValue);
+                delegate.onWindowClosed = aValue;
             }
         });
         if(!P.Form){
@@ -412,10 +415,10 @@
         Object.defineProperty(this, "onWindowClosing", {
             get: function() {
                 var value = delegate.onWindowClosing;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onWindowClosing = P.boxAsJava(aValue);
+                delegate.onWindowClosing = aValue;
             }
         });
         if(!P.Form){
@@ -457,14 +460,13 @@
         };
 
         /**
-         * Shows the form as a dialog (modal window).
-         * @param callback a callback handler function
-         * @method showModal
+         * Shows the form as an ordinary window.
+         * @method show
          * @memberOf Form
          */
-        P.Form.prototype.showModal = function(callback) {
+        P.Form.prototype.show = function() {
             var delegate = this.unwrap();
-            var value = delegate.showModal(P.boxAsJava(callback));
+            var value = delegate.show();
             return P.boxAsJs(value);
         };
 
@@ -480,13 +482,25 @@
         };
 
         /**
-         * Shows the form as an ordinary window.
-         * @method show
+         * Shows the form as a dialog (modal window).
+         * @param callback a callback handler function
+         * @method showModal
          * @memberOf Form
          */
-        P.Form.prototype.show = function() {
+        P.Form.prototype.showModal = function(callback) {
             var delegate = this.unwrap();
-            var value = delegate.show();
+            var value = delegate.showModal(P.boxAsJava(callback));
+            return P.boxAsJs(value);
+        };
+
+        /**
+         * Maximizes this form.
+         * @method maximize
+         * @memberOf Form
+         */
+        P.Form.prototype.maximize = function() {
+            var delegate = this.unwrap();
+            var value = delegate.maximize();
             return P.boxAsJs(value);
         };
 
@@ -509,17 +523,6 @@
         P.Form.prototype.restore = function() {
             var delegate = this.unwrap();
             var value = delegate.restore();
-            return P.boxAsJs(value);
-        };
-
-        /**
-         * Maximizes this form.
-         * @method maximize
-         * @memberOf Form
-         */
-        P.Form.prototype.maximize = function() {
-            var delegate = this.unwrap();
-            var value = delegate.maximize();
             return P.boxAsJs(value);
         };
 

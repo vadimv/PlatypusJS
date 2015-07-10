@@ -4,10 +4,11 @@
  */
 package com.eas.server;
 
+import com.eas.client.login.PlatypusPrincipal;
 import com.eas.script.AlreadyPublishedException;
 import com.eas.script.HasPublished;
-import com.eas.script.NoPublisherException;
 import com.eas.script.ScriptFunction;
+import com.eas.script.Scripts;
 import com.eas.server.scripts.ModulesJSFacade;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,29 +34,59 @@ public class Session implements HasPublished {
     protected JSObject published;
     //
     private final String sessionId;
-    private final long ctime;
+    private final AtomicLong ctime = new AtomicLong();
     private final AtomicLong atime = new AtomicLong();
     private final Map<String, JSObject> modulesInstances = new HashMap<>();
     private int maxInactiveInterval = 3600000; // 1 hour
+    private Scripts.Space space;
+    private PlatypusPrincipal principal;
     private final JSObject jsModules = new ModulesJSFacade(this);
 
     /**
      * Creates a new session with given session id.
      *
-     * @param aServerCore
      * @param aSessionId unique session id.
      */
     public Session(String aSessionId) {
         super();
         sessionId = aSessionId;
-        ctime = System.currentTimeMillis();
-        atime.set(ctime);
+        ctime.set(System.currentTimeMillis());
+        atime.set(ctime.get());
+    }
+
+    public Scripts.Space getSpace() {
+        return space;
+    }
+
+    public void setSpace(Scripts.Space aValue) {
+        if (space != null) {
+            space.setSession(null);
+        }
+        space = aValue;
+        if (space != null) {
+            space.setSession(this);
+        }
+    }
+
+    /**
+     * Warning!!! Don't call this getter. It is provided only for TSA Server
+     * authentication process. Instead use Scripts.getContext().getPrincipal()
+     * please.
+     *
+     * @return
+     */
+    public PlatypusPrincipal getPrincipal() {
+        return principal;
+    }
+
+    public void setPrincipal(PlatypusPrincipal aValue) {
+        principal = aValue;
     }
 
     /**
      * Deletes all resources belonging to this session.
      */
-    public synchronized void cleanup() {
+    public void cleanup() {
         // server modules
         modulesInstances.clear();
         // data in client's transaction
@@ -67,7 +98,7 @@ public class Session implements HasPublished {
      * @return session creation time.
      */
     public long getCTime() {
-        return ctime;
+        return ctime.get();
     }
 
     /**
@@ -103,43 +134,43 @@ public class Session implements HasPublished {
         return atime.get();
     }
 
-/*
-    public void setPrincipal(PlatypusPrincipal aPrincipal) {
-        String oldUserName = principal != null ? principal.getName() : null;
-        String newUserName = aPrincipal != null ? aPrincipal.getName() : null;
-        if (oldUserName == null ? newUserName != null : !oldUserName.equals(newUserName)) {
-            userContext = null;
-            if (newUserName != null && serverCore != null && serverCore.getDatabasesClient() != null) {
-                try {
-                    Map<String, String> userProps = DatabasesClient.getUserProperties(serverCore.getDatabasesClient(), newUserName, null, null);
-                    userContext = userProps.get(ClientConstants.F_USR_CONTEXT);
-                } catch (Exception ex) {
-                    Logger.getLogger(SessionManager.class.getName()).log(Level.WARNING, "Could not get user {0} properties (USR_CONTEXT, etc).", newUserName);
-                }
-            }
-        }
-        if (principal != null) {
-            principal.setContext(null);
-        }
-        principal = aPrincipal;
-        if (principal != null) {
-            // let's update pricipal's 
-            principal.setContext(userContext);
-            // pricipal's roles are processed by container, so there is no need to update them here
-        }
-    }
-*/
+    /*
+     public void setPrincipal(PlatypusPrincipal aPrincipal) {
+     String oldUserName = principal != null ? principal.getName() : null;
+     String newUserName = aPrincipal != null ? aPrincipal.getName() : null;
+     if (oldUserName == null ? newUserName != null : !oldUserName.equals(newUserName)) {
+     userContext = null;
+     if (newUserName != null && serverCore != null && serverCore.getDatabasesClient() != null) {
+     try {
+     Map<String, String> userProps = DatabasesClient.getUserProperties(serverCore.getDatabasesClient(), newUserName, null, null);
+     userContext = userProps.get(ClientConstants.F_USR_CONTEXT);
+     } catch (Exception ex) {
+     Logger.getLogger(SessionManager.class.getName()).log(Level.WARNING, "Could not get user {0} properties (USR_CONTEXT, etc).", newUserName);
+     }
+     }
+     }
+     if (principal != null) {
+     principal.setContext(null);
+     }
+     principal = aPrincipal;
+     if (principal != null) {
+     // let's update pricipal's 
+     principal.setContext(userContext);
+     // pricipal's roles are processed by container, so there is no need to update them here
+     }
+     }
+     */
     /**
      * Returns server module by name.
      *
      * @param aName
      * @return
      */
-    public synchronized JSObject getModule(String aName) {
+    public JSObject getModule(String aName) {
         return modulesInstances.get(aName);
     }
 
-    public synchronized boolean containsModule(String aName) {
+    public boolean containsModule(String aName) {
         return modulesInstances.containsKey(aName);
     }
 
@@ -147,7 +178,7 @@ public class Session implements HasPublished {
         registerModule(null, aModule);
     }
 
-    public synchronized void registerModule(String aName, JSObject aModule) {
+    public void registerModule(String aName, JSObject aModule) {
         if (aName == null || aName.isEmpty()) {
             JSObject c = (JSObject) aModule.getMember("constructor");
             aName = JSType.toString(c.getMember("name"));
@@ -155,15 +186,15 @@ public class Session implements HasPublished {
         modulesInstances.put(aName, aModule);
     }
 
-    public synchronized void unregisterModule(String aModuleName) {
+    public void unregisterModule(String aModuleName) {
         modulesInstances.remove(aModuleName);
     }
 
-    public synchronized void unregisterModules() {
+    public void unregisterModules() {
         modulesInstances.clear();
     }
 
-    public synchronized Set<Map.Entry<String, JSObject>> getModulesEntries() {
+    public Set<Map.Entry<String, JSObject>> getModulesEntries() {
         return Collections.unmodifiableSet(modulesInstances.entrySet());
     }
 
@@ -206,18 +237,6 @@ public class Session implements HasPublished {
 
     @Override
     public JSObject getPublished() {
-        if (published == null) {
-            if (publisher == null || !publisher.isFunction()) {
-                throw new NoPublisherException();
-            }
-            published = (JSObject) publisher.call(null, new Object[]{this});
-        }
         return published;
-    }
-
-    private static JSObject publisher;
-
-    public static void setPublisher(JSObject aPublisher) {
-        publisher = aPublisher;
     }
 }

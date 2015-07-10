@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.forms.components.CheckBox");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.forms.components.CheckBox";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.CheckBox(null, null, null, aDelegate);
     });
     
@@ -21,6 +23,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -48,10 +51,10 @@
         Object.defineProperty(this, "onMouseDragged", {
             get: function() {
                 var value = delegate.onMouseDragged;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseDragged = P.boxAsJava(aValue);
+                delegate.onMouseDragged = aValue;
             }
         });
         if(!P.CheckBox){
@@ -65,10 +68,10 @@
         Object.defineProperty(this, "onMouseReleased", {
             get: function() {
                 var value = delegate.onMouseReleased;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseReleased = P.boxAsJava(aValue);
+                delegate.onMouseReleased = aValue;
             }
         });
         if(!P.CheckBox){
@@ -82,10 +85,10 @@
         Object.defineProperty(this, "onFocusLost", {
             get: function() {
                 var value = delegate.onFocusLost;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onFocusLost = P.boxAsJava(aValue);
+                delegate.onFocusLost = aValue;
             }
         });
         if(!P.CheckBox){
@@ -99,10 +102,10 @@
         Object.defineProperty(this, "onValueChange", {
             get: function() {
                 var value = delegate.onValueChange;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onValueChange = P.boxAsJava(aValue);
+                delegate.onValueChange = aValue;
             }
         });
         if(!P.CheckBox){
@@ -116,10 +119,10 @@
         Object.defineProperty(this, "onMousePressed", {
             get: function() {
                 var value = delegate.onMousePressed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMousePressed = P.boxAsJava(aValue);
+                delegate.onMousePressed = aValue;
             }
         });
         if(!P.CheckBox){
@@ -185,10 +188,10 @@
         Object.defineProperty(this, "onComponentMoved", {
             get: function() {
                 var value = delegate.onComponentMoved;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentMoved = P.boxAsJava(aValue);
+                delegate.onComponentMoved = aValue;
             }
         });
         if(!P.CheckBox){
@@ -253,10 +256,10 @@
         Object.defineProperty(this, "onComponentResized", {
             get: function() {
                 var value = delegate.onComponentResized;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentResized = P.boxAsJava(aValue);
+                delegate.onComponentResized = aValue;
             }
         });
         if(!P.CheckBox){
@@ -300,10 +303,10 @@
         Object.defineProperty(this, "onMouseEntered", {
             get: function() {
                 var value = delegate.onMouseEntered;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseEntered = P.boxAsJava(aValue);
+                delegate.onMouseEntered = aValue;
             }
         });
         if(!P.CheckBox){
@@ -313,22 +316,6 @@
              * @memberOf CheckBox
              */
             P.CheckBox.prototype.onMouseEntered = {};
-        }
-        Object.defineProperty(this, "selected", {
-            get: function() {
-                var value = delegate.selected;
-                return P.boxAsJs(value);
-            },
-            set: function(aValue) {
-                delegate.selected = P.boxAsJava(aValue);
-            }
-        });
-        if(!P.CheckBox){
-            /**
-             * @property selected
-             * @memberOf CheckBox
-             * Determines whether this component is selected.*/
-            P.CheckBox.prototype.selected = true;
         }
         Object.defineProperty(this, "toolTipText", {
             get: function() {
@@ -346,6 +333,22 @@
              * @memberOf CheckBox
              */
             P.CheckBox.prototype.toolTipText = '';
+        }
+        Object.defineProperty(this, "selected", {
+            get: function() {
+                var value = delegate.selected;
+                return P.boxAsJs(value);
+            },
+            set: function(aValue) {
+                delegate.selected = P.boxAsJava(aValue);
+            }
+        });
+        if(!P.CheckBox){
+            /**
+             * @property selected
+             * @memberOf CheckBox
+             * Determines whether this component is selected.*/
+            P.CheckBox.prototype.selected = true;
         }
         Object.defineProperty(this, "height", {
             get: function() {
@@ -381,10 +384,10 @@
         Object.defineProperty(this, "onComponentShown", {
             get: function() {
                 var value = delegate.onComponentShown;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentShown = P.boxAsJava(aValue);
+                delegate.onComponentShown = aValue;
             }
         });
         if(!P.CheckBox){
@@ -398,10 +401,10 @@
         Object.defineProperty(this, "onMouseMoved", {
             get: function() {
                 var value = delegate.onMouseMoved;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseMoved = P.boxAsJava(aValue);
+                delegate.onMouseMoved = aValue;
             }
         });
         if(!P.CheckBox){
@@ -449,10 +452,10 @@
         Object.defineProperty(this, "onComponentHidden", {
             get: function() {
                 var value = delegate.onComponentHidden;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentHidden = P.boxAsJava(aValue);
+                delegate.onComponentHidden = aValue;
             }
         });
         if(!P.CheckBox){
@@ -483,10 +486,10 @@
         Object.defineProperty(this, "onKeyReleased", {
             get: function() {
                 var value = delegate.onKeyReleased;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onKeyReleased = P.boxAsJava(aValue);
+                delegate.onKeyReleased = aValue;
             }
         });
         if(!P.CheckBox){
@@ -500,10 +503,10 @@
         Object.defineProperty(this, "onActionPerformed", {
             get: function() {
                 var value = delegate.onActionPerformed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onActionPerformed = P.boxAsJava(aValue);
+                delegate.onActionPerformed = aValue;
             }
         });
         if(!P.CheckBox){
@@ -534,10 +537,10 @@
         Object.defineProperty(this, "onKeyTyped", {
             get: function() {
                 var value = delegate.onKeyTyped;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onKeyTyped = P.boxAsJava(aValue);
+                delegate.onKeyTyped = aValue;
             }
         });
         if(!P.CheckBox){
@@ -551,10 +554,10 @@
         Object.defineProperty(this, "onMouseWheelMoved", {
             get: function() {
                 var value = delegate.onMouseWheelMoved;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseWheelMoved = P.boxAsJava(aValue);
+                delegate.onMouseWheelMoved = aValue;
             }
         });
         if(!P.CheckBox){
@@ -582,10 +585,10 @@
         Object.defineProperty(this, "onFocusGained", {
             get: function() {
                 var value = delegate.onFocusGained;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onFocusGained = P.boxAsJava(aValue);
+                delegate.onFocusGained = aValue;
             }
         });
         if(!P.CheckBox){
@@ -633,10 +636,10 @@
         Object.defineProperty(this, "onMouseClicked", {
             get: function() {
                 var value = delegate.onMouseClicked;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseClicked = P.boxAsJava(aValue);
+                delegate.onMouseClicked = aValue;
             }
         });
         if(!P.CheckBox){
@@ -650,10 +653,10 @@
         Object.defineProperty(this, "onMouseExited", {
             get: function() {
                 var value = delegate.onMouseExited;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseExited = P.boxAsJava(aValue);
+                delegate.onMouseExited = aValue;
             }
         });
         if(!P.CheckBox){
@@ -715,10 +718,10 @@
         Object.defineProperty(this, "onKeyPressed", {
             get: function() {
                 var value = delegate.onKeyPressed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onKeyPressed = P.boxAsJava(aValue);
+                delegate.onKeyPressed = aValue;
             }
         });
         if(!P.CheckBox){

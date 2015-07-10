@@ -5,12 +5,14 @@
  */
 package com.eas.server.websocket;
 
-import com.eas.client.login.PlatypusPrincipal;
 import com.eas.script.AlreadyPublishedException;
 import com.eas.script.HasPublished;
 import com.eas.script.NoPublisherException;
 import com.eas.script.ScriptFunction;
-import com.eas.script.ScriptUtils;
+import com.eas.script.Scripts;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.websocket.CloseReason;
 import javax.websocket.Session;
 import jdk.nashorn.api.scripting.JSObject;
@@ -23,47 +25,10 @@ public class WebSocketServerSession implements HasPublished {
 
     protected JSObject published;
     protected Session session;
-    protected com.eas.server.Session platypusSession;
-    protected PlatypusPrincipal principal;
-    protected Object lock;
-    protected Object request;
-    protected Object response;
-    //
-    protected JSObject onClose;
-    protected JSObject onError;
-    protected JSObject onMessage;
 
-    public WebSocketServerSession(Session aSession, com.eas.server.Session aPlatypusSession, PlatypusPrincipal aPlatypusPrincipal) {
+    public WebSocketServerSession(Session aSession) {
         super();
         session = aSession;
-        platypusSession = aPlatypusSession;
-        principal = aPlatypusPrincipal;
-        request = ScriptUtils.getRequest();
-        response = ScriptUtils.getResponse();
-    }
-
-    public com.eas.server.Session getPlatypusSession() {
-        return platypusSession;
-    }
-
-    public PlatypusPrincipal getPrincipal() {
-        return principal;
-    }
-
-    public Object getLock() {
-        return lock;
-    }
-
-    public void setLock(Object aValue) {
-        lock = aValue;
-    }
-
-    public Object getRequest() {
-        return request;
-    }
-
-    public Object getResponse() {
-        return response;
     }
 
     @ScriptFunction
@@ -81,7 +46,13 @@ public class WebSocketServerSession implements HasPublished {
 
     @ScriptFunction(params = "data")
     public void send(String aData) {
-        session.getAsyncRemote().sendText(aData);
+        if (aData != null && session.isOpen()) {
+            try {
+                session.getBasicRemote().sendText(aData);
+            } catch (IOException ex) {
+                Logger.getLogger(WebSocketServerSession.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
     }
 
     @ScriptFunction
@@ -104,36 +75,6 @@ public class WebSocketServerSession implements HasPublished {
         return session.getRequestURI().toString();
     }
 
-    @ScriptFunction
-    public JSObject getOnclose() {
-        return onClose;
-    }
-
-    @ScriptFunction
-    public void setOnclose(JSObject aValue) {
-        onClose = aValue;
-    }
-
-    @ScriptFunction
-    public JSObject getOnerror() {
-        return onError;
-    }
-
-    @ScriptFunction
-    public void setOnerror(JSObject aValue) {
-        onError = aValue;
-    }
-
-    @ScriptFunction
-    public JSObject getOnmessage() {
-        return onMessage;
-    }
-
-    @ScriptFunction
-    public void setOnmessage(JSObject aValue) {
-        onMessage = aValue;
-    }
-
     @Override
     public void setPublished(JSObject aValue) {
         if (published != null) {
@@ -145,17 +86,12 @@ public class WebSocketServerSession implements HasPublished {
     @Override
     public JSObject getPublished() {
         if (published == null) {
+            JSObject publisher = Scripts.getSpace().getPublisher(this.getClass().getName());
             if (publisher == null || !publisher.isFunction()) {
                 throw new NoPublisherException();
             }
             published = (JSObject) publisher.call(null, new Object[]{this});
         }
         return published;
-    }
-
-    private static JSObject publisher;
-
-    public static void setPublisher(JSObject aPublisher) {
-        publisher = aPublisher;
     }
 }

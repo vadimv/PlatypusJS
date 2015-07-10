@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.forms.events.ComponentEvent");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.forms.events.ComponentEvent";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.ComponentEvent(aDelegate);
     });
     
@@ -15,6 +17,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }

@@ -6,10 +6,8 @@ import java.util.logging.Logger;
 
 import com.bearsoft.gwt.ui.CommonResources;
 import com.bearsoft.gwt.ui.widgets.StyledListBox;
-import com.bearsoft.rowset.Utils;
-import com.bearsoft.rowset.beans.PropertyChangeEvent;
-import com.bearsoft.rowset.beans.PropertyChangeListener;
-import com.bearsoft.rowset.utils.IDGenerator;
+import com.eas.client.IDGenerator;
+import com.eas.client.Utils;
 import com.eas.client.converters.StringValueConverter;
 import com.eas.client.form.ControlsUtils;
 import com.eas.client.form.JavaScriptObjectKeyProvider;
@@ -22,6 +20,8 @@ import com.eas.client.form.published.PublishedCell;
 import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.core.client.Scheduler;
 import com.google.gwt.core.client.Scheduler.ScheduledCommand;
+import com.google.gwt.dom.client.Document;
+import com.google.gwt.dom.client.Element;
 import com.google.gwt.dom.client.Style;
 import com.google.gwt.event.logical.shared.ValueChangeEvent;
 import com.google.gwt.event.logical.shared.ValueChangeHandler;
@@ -40,6 +40,8 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 	protected HandlerRegistration boundToList;
 	protected HandlerRegistration boundToListElements;
 	protected Runnable onRedraw;
+	protected Element nonListMask;
+	protected Element nonListMaskAligner;
 
 	protected boolean list = true;
 
@@ -51,6 +53,21 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 		box.getElement().getStyle().setOverflow(Style.Overflow.HIDDEN);
         CommonResources.INSTANCE.commons().ensureInjected();
         box.getElement().addClassName(CommonResources.INSTANCE.commons().withoutDropdown());
+        nonListMask = Document.get().createDivElement();
+        nonListMask.getStyle().setPosition(Style.Position.RELATIVE);
+        nonListMask.getStyle().setDisplay(Style.Display.NONE);
+        nonListMask.getStyle().setVerticalAlign(Style.VerticalAlign.MIDDLE);
+        nonListMask.getStyle().setPaddingLeft(4, Style.Unit.PX);
+        
+        nonListMaskAligner = Document.get().createDivElement();
+        nonListMaskAligner.getStyle().setVisibility(Style.Visibility.HIDDEN);
+        nonListMaskAligner.getStyle().setPosition(Style.Position.RELATIVE);
+        nonListMaskAligner.getStyle().setDisplay(Style.Display.INLINE_BLOCK);
+        nonListMaskAligner.getStyle().setHeight(100, Style.Unit.PCT);
+        nonListMaskAligner.getStyle().setVerticalAlign(Style.VerticalAlign.MIDDLE);
+        
+        contentWrapper.getElement().insertFirst(nonListMaskAligner);
+        contentWrapper.getElement().insertFirst(nonListMask);
 	}
 
 	public Runnable getOnRedraw() {
@@ -110,6 +127,7 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 				injected = aValue;
 			}
 			super.setValue(aValue, fireEvents);
+			nonListMask.setInnerText(box.getSelectedItemText());
 		}
 	}
 
@@ -171,6 +189,7 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 			}
 			int valueIndex = box.indexOf(value);
 			box.setSelectedIndex(valueIndex);
+			nonListMask.setInnerText(box.getSelectedItemText());
 			if (onRedraw != null)
 				onRedraw.run();
 		} catch (Exception e) {
@@ -279,8 +298,12 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 			StyledListBox<JavaScriptObject> box = (StyledListBox<JavaScriptObject>) decorated;
 			if (list){
 				box.getElement().addClassName(CUSTOM_DROPDOWN_CLASS);
+				box.getElement().getStyle().clearVisibility();
+				nonListMask.getStyle().setDisplay(Style.Display.NONE);
 			}else{
 				box.getElement().removeClassName(CUSTOM_DROPDOWN_CLASS);
+				box.getElement().getStyle().setVisibility(Style.Visibility.HIDDEN);
+				nonListMask.getStyle().setDisplay(Style.Display.INLINE_BLOCK);
 			}
 			redraw();
 		}
@@ -337,10 +360,10 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 						boundToListElements = null;
 					}
 					if (displayList != null) {
-						boundToListElements = Utils.listenElements(displayList, new PropertyChangeListener() {
-
+						boundToListElements = Utils.listenElements(displayList, new Utils.OnChangeHandler() {
+							
 							@Override
-							public void propertyChange(PropertyChangeEvent evt) {
+							public void onChange(JavaScriptObject anEvent) {
 								enqueueListChanges();
 							}
 						});
@@ -353,9 +376,10 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 
 	protected void bindList() {
 		if (displayList != null) {
-			boundToList = Utils.listen(displayList, "length", new PropertyChangeListener() {
+			boundToList = Utils.listenPath(displayList, "length", new Utils.OnChangeHandler() {
+				
 				@Override
-				public void propertyChange(PropertyChangeEvent evt) {
+				public void onChange(JavaScriptObject anEvent) {
 					enqueueListReadd();
 				}
 			});
@@ -390,4 +414,13 @@ public class ModelCombo extends ModelDecoratorBox<JavaScriptObject> implements H
 			bindList();
 		}
 	}
+
+	@Override
+    protected void setReadonly(boolean aValue) {
+    }
+
+	@Override
+    protected boolean isReadonly() {
+	    return false;
+    }
 }

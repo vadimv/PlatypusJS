@@ -5,8 +5,6 @@
  */
 package com.eas.client.resourcepool;
 
-import com.bearsoft.rowset.resourcepool.BearResourcePool;
-import com.eas.client.resourcepool.GeneralResourceProvider;
 import com.eas.client.settings.DbConnectionSettings;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -119,10 +117,10 @@ public class DatasourcesArgsConsumer {
     }
 
     public void registerDatasources() throws SQLException {
-        for (DbConnectionSettings settings : parsedDatasources) {
+        parsedDatasources.stream().forEach((settings) -> {
             GeneralResourceProvider.getInstance().registerDatasource(settings.getName(), settings);
             Logger.getLogger(DatasourcesArgsConsumer.class.getName()).log(Level.INFO, "Datasource \"{0}\" has been registered", settings.getName());
-        }
+        });
     }
 
 }

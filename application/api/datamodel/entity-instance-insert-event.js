@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.model.application.EntityInstanceInsertEvent");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.model.application.EntityInstanceInsertEvent";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.EntityInstanceInsertEvent(aDelegate);
     });
     
@@ -15,6 +17,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -25,7 +28,7 @@
         Object.defineProperty(this, "inserted", {
             get: function() {
                 var value = delegate.inserted;
-                return P.boxAsJs(value);
+                return value;
             }
         });
         if(!P.EntityInstanceInsertEvent){
@@ -53,7 +56,7 @@
         Object.defineProperty(this, "object", {
             get: function() {
                 var value = delegate.object;
-                return P.boxAsJs(value);
+                return value;
             }
         });
         if(!P.EntityInstanceInsertEvent){

@@ -2,7 +2,7 @@ package com.eas.client.form.published.widgets;
 
 import com.bearsoft.gwt.ui.XElement;
 import com.bearsoft.gwt.ui.widgets.FormattedObjectBox;
-import com.bearsoft.rowset.Utils;
+import com.eas.client.Utils;
 import com.eas.client.form.ControlsUtils;
 import com.eas.client.form.EventsExecutor;
 import com.eas.client.form.events.ActionEvent;
@@ -223,9 +223,6 @@ public class PlatypusFormattedTextField extends FormattedObjectBox implements Ha
 				aWidget.@com.eas.client.form.published.HasEmptyText::setEmptyText(Ljava/lang/String;)(aValue!=null?''+aValue:null);
 			}
 		});
-		// FormattedField is plain non-model control.
-		// But it has value property as an only case.
-		// In other cases only model-controls have value property
 		Object.defineProperty(published, "value", {
 			get : function() {
 				return $wnd.P.boxAsJs(aWidget.@com.eas.client.form.published.widgets.PlatypusFormattedTextField::getJsValue()());
@@ -234,6 +231,15 @@ public class PlatypusFormattedTextField extends FormattedObjectBox implements Ha
 				aWidget.@com.eas.client.form.published.widgets.PlatypusFormattedTextField::setJsValue(Ljava/lang/Object;)($wnd.P.boxAsJava(aValue));
 			}
 		});
+		Object.defineProperty(published, "valueType", {
+			get : function() {
+				return $wnd.P.boxAsJs(aWidget.@com.eas.client.form.published.widgets.PlatypusFormattedTextField::getValueType()());
+			},
+			set : function(aValue) {
+				aWidget.@com.eas.client.form.published.widgets.PlatypusFormattedTextField::setValueType(I)(aValue != null ? aValue : null);
+			}
+		});
+		
 		Object.defineProperty(published, "format", {
 			get : function() {
 				return aWidget.@com.eas.client.form.published.widgets.PlatypusFormattedTextField::getFormat()();

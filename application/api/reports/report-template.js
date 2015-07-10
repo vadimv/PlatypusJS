@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.reports.ReportTemplate");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.reports.ReportTemplate";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.ReportTemplate(null, null, aDelegate);
     });
     
@@ -19,6 +21,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -63,10 +66,10 @@
         Object.defineProperty(this, "fixed", {
             get: function() {
                 var value = delegate.fixed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.fixed = P.boxAsJava(aValue);
+                delegate.fixed = aValue;
             }
         });
         if(!P.ReportTemplate){

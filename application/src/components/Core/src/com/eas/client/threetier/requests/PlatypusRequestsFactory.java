@@ -32,11 +32,11 @@ public class PlatypusRequestsFactory {
                 return new ModuleStructureRequest();
             // Server modules requests
             case Requests.rqCreateServerModule:
-                return new CreateServerModuleRequest();
+                return new ServerModuleStructureRequest();
             case Requests.rqDisposeServerModule:
                 return new DisposeServerModuleRequest();
             case Requests.rqExecuteServerModuleMethod:
-                return new ExecuteServerModuleMethodRequest();
+                return new RPCRequest();
             // User sessions requests
             case Requests.rqLogout:
                 return new LogoutRequest();

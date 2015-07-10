@@ -4,10 +4,10 @@
  */
 package com.eas.client;
 
-import com.bearsoft.rowset.utils.IDGenerator;
 import com.eas.client.cache.PlatypusFiles;
 import com.eas.client.cache.PlatypusFilesSupport;
 import com.eas.util.FileUtils;
+import com.eas.util.IDGenerator;
 import java.io.File;
 import java.util.Collections;
 import java.util.Date;
@@ -46,7 +46,7 @@ public class AppElementFiles {
         } else if (appElementType == ClientConstants.ET_QUERY) {
             return PlatypusFilesSupport.getAppElementIdByAnnotation(findFileByExtension(PlatypusFiles.SQL_EXTENSION));
         } else if (appElementType == ClientConstants.ET_DB_SCHEME) {
-            return IDGenerator.genID().toString();
+            return IDGenerator.genID() + "";
         }
         return null;
     }

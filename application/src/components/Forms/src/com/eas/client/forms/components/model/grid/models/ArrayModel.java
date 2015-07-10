@@ -4,8 +4,10 @@
  */
 package com.eas.client.forms.components.model.grid.models;
 
+import com.eas.client.forms.Forms;
 import com.eas.client.forms.components.model.ModelWidget;
 import com.eas.client.forms.components.model.grid.columns.ModelColumn;
+import com.eas.script.Scripts;
 import java.awt.EventQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,16 +41,16 @@ public abstract class ArrayModel {
 
     protected void enqueueElementsChanged() {
         if (boundToDataElements != null) {
-            JSObject unlisten = (JSObject) boundToDataElements.getMember("unlisten");
-            unlisten.call(null, new Object[]{});
+            Scripts.unlisten(boundToDataElements);
             boundToDataElements = null;
         }
         elementsChangedEnqueued = true;
         EventQueue.invokeLater(() -> {
+            Scripts.setContext(Forms.getContext());
             if (elementsChangedEnqueued) {
                 elementsChangedEnqueued = false;
-                if (data != null && com.eas.script.ScriptUtils.isInitialized()) {
-                    boundToDataElements = com.eas.script.ScriptUtils.listenElements(data, new AbstractJSObject() {
+                if (data != null && Scripts.isInitialized()) {
+                    boundToDataElements = Scripts.getSpace().listenElements(data, new AbstractJSObject() {
 
                         @Override
                         public Object call(Object thiz, Object... args) {
@@ -68,6 +70,7 @@ public abstract class ArrayModel {
     protected void enqueueElementsDataChanged() {
         elementsDataChangedEnqueued = true;
         EventQueue.invokeLater(() -> {
+            Scripts.setContext(Forms.getContext());
             if (elementsDataChangedEnqueued) {
                 elementsDataChangedEnqueued = false;
                 fireElementsDataChanged();
@@ -76,8 +79,8 @@ public abstract class ArrayModel {
     }
 
     protected void bind() {
-        if (data != null && com.eas.script.ScriptUtils.isInitialized()) {
-            boundToData = com.eas.script.ScriptUtils.listen(data, "length", new AbstractJSObject() {
+        if (data != null && Scripts.isInitialized()) {
+            boundToData = Scripts.getSpace().listen(data, "length", new AbstractJSObject() {
 
                 @Override
                 public Object call(Object thiz, Object... args) {
@@ -91,13 +94,11 @@ public abstract class ArrayModel {
 
     protected void unbind() {
         if (boundToData != null) {
-            JSObject unlisten = (JSObject) boundToData.getMember("unlisten");
-            unlisten.call(null, new Object[]{});
+            Scripts.unlisten(boundToData);
             boundToData = null;
         }
         if (boundToDataElements != null) {
-            JSObject unlisten = (JSObject) boundToDataElements.getMember("unlisten");
-            unlisten.call(null, new Object[]{});
+            Scripts.unlisten(boundToDataElements);
             boundToDataElements = null;
         }
     }

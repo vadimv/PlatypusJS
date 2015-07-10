@@ -5,7 +5,7 @@ import java.util.logging.Logger;
 
 import com.bearsoft.gwt.ui.CommonResources;
 import com.bearsoft.gwt.ui.XElement;
-import com.bearsoft.rowset.Cancellable;
+import com.eas.client.Cancellable;
 import com.eas.client.application.AppClient;
 import com.eas.client.form.ControlsUtils;
 import com.eas.client.form.EventsExecutor;
@@ -269,7 +269,7 @@ HasShowHandlers, HasHideHandlers, HasResizeHandlers, RequiresResize, HasFocusHan
 		btnBackground.addClickHandler(new ClickHandler() {
 			@Override
 			public void onClick(ClickEvent event) {
-				ControlsUtils.selectColor(new Callback<String, String>() {
+				ControlsUtils.selectColor(textContainer.getFormatter().getBackColor(), new Callback<String, String>() {
 					@Override
 					public void onSuccess(String result) {
 						try {
@@ -288,7 +288,7 @@ HasShowHandlers, HasHideHandlers, HasResizeHandlers, RequiresResize, HasFocusHan
 		btnForeground.addClickHandler(new ClickHandler() {
 			@Override
 			public void onClick(ClickEvent event) {
-				ControlsUtils.selectColor(new Callback<String, String>() {
+				ControlsUtils.selectColor(textContainer.getFormatter().getForeColor(), new Callback<String, String>() {
 					@Override
 					public void onSuccess(String result) {
 						try {

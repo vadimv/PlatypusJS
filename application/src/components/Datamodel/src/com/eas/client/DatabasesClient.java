@@ -1,27 +1,29 @@
 package com.eas.client;
 
-import com.bearsoft.rowset.Converter;
-import com.bearsoft.rowset.Row;
-import com.bearsoft.rowset.Rowset;
-import com.bearsoft.rowset.changes.Change;
-import com.bearsoft.rowset.dataflow.FlowProvider;
-import com.bearsoft.rowset.exceptions.ResourceUnavalableException;
-import com.bearsoft.rowset.jdbc.JdbcReader;
-import com.bearsoft.rowset.jdbc.StatementsGenerator;
-import com.bearsoft.rowset.jdbc.StatementsGenerator.StatementsLogEntry;
-import com.bearsoft.rowset.metadata.*;
+import com.eas.client.changes.Change;
+import com.eas.client.changes.EntitiesHost;
+import com.eas.client.dataflow.ColumnsIndicies;
+import com.eas.client.dataflow.Converter;
+import com.eas.client.dataflow.StatementsGenerator;
 import com.eas.client.login.PlatypusPrincipal;
+import com.eas.client.metadata.DataTypeInfo;
+import com.eas.client.metadata.Field;
+import com.eas.client.metadata.Fields;
+import com.eas.client.metadata.Parameter;
+import com.eas.client.metadata.Parameters;
 import com.eas.client.queries.ContextHost;
 import com.eas.client.queries.QueriesProxy;
 import com.eas.client.resourcepool.GeneralResourceProvider;
+import com.eas.client.resourcepool.ResourceUnavalableException;
 import com.eas.client.sqldrivers.SqlDriver;
 import com.eas.concurrent.CallableConsumer;
 import com.eas.concurrent.DeamonThreadFactory;
-import com.eas.script.ScriptUtils;
+import com.eas.script.Scripts;
 import com.eas.util.StringUtils;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -46,10 +48,10 @@ public class DatabasesClient {
     private static final String SELECT_BY_FIELD_QUERY = "select * from %s where Upper(%s) = :%s";
     private static final String USER_QUERY_TEXT = String.format(SELECT_BY_FIELD_QUERY, ClientConstants.T_MTD_USERS, ClientConstants.F_USR_NAME, USERNAME_PARAMETER_NAME);
     private static final String USER_GROUPS_QUERY_TEXT = String.format(SELECT_BY_FIELD_QUERY, ClientConstants.T_MTD_GROUPS, ClientConstants.F_USR_NAME, USERNAME_PARAMETER_NAME);
-    public static final String TYPES_INFO_TRACE_MSG = "Getting types info. DbId %s";
+    public static final String TYPES_INFO_TRACE_MSG = "Getting types info. DatasourceName %s";
     public static final String USER_MISSING_MSG = "No user found (%s)";
     // metadata
-    protected Map<String, DatabaseMdCache> mdCaches = new HashMap<>();
+    protected Map<String, DatabaseMdCache> mdCaches = new ConcurrentHashMap<>();
     protected boolean autoFillMetadata = true;
     // callback interface for context
     protected ContextHost contextHost;
@@ -70,12 +72,16 @@ public class DatabasesClient {
     public DatabasesClient(String aDefaultDatasourceName, boolean aAutoFillMetadata, int aMaxJdbcThreads) throws Exception {
         super();
         jdbcProcessor = new ThreadPoolExecutor(aMaxJdbcThreads, aMaxJdbcThreads,
-                10L, TimeUnit.SECONDS,
+                3L, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(),
                 new DeamonThreadFactory("jdbc-", false));
         jdbcProcessor.allowCoreThreadTimeOut(true);
         defaultDatasourceName = aDefaultDatasourceName;
         autoFillMetadata = aAutoFillMetadata;
+    }
+
+    public void shutdown() {
+        jdbcProcessor.shutdownNow();
     }
 
     public QueriesProxy<SqlQuery> getQueries() {
@@ -96,16 +102,7 @@ public class DatabasesClient {
 
     public void setDefaultDatasourceName(String aValue, boolean fireEvents) throws Exception {
         if (defaultDatasourceName == null ? aValue != null : !defaultDatasourceName.equals(aValue)) {
-            String oldDefaultDatasourceName = defaultDatasourceName;
-            DatabaseMdCache oldMdCache = mdCaches.remove(null);
-            DatabaseMdCache newMdCache = mdCaches.remove(aValue);
             defaultDatasourceName = aValue;
-            if (oldMdCache != null) {
-                mdCaches.put(oldDefaultDatasourceName, oldMdCache);
-            }
-            if (newMdCache != null) {
-                mdCaches.put(null, newMdCache);
-            }
         }
     }
 
@@ -117,7 +114,7 @@ public class DatabasesClient {
         if (aDataSourceName == null) {
             aDataSourceName = defaultDatasourceName;
         }
-        if (aDataSourceName != null) {
+        if (aDataSourceName != null && !aDataSourceName.isEmpty()) {
             Context initContext = new InitialContext();
             try {
                 // J2EE servers
@@ -133,7 +130,7 @@ public class DatabasesClient {
                 }
             }
         } else {
-            throw new NamingException("Null datasource name is not allowed (Default datasource name is null also).");
+            throw new NamingException("Datasource name missing.");
         }
     }
 
@@ -156,7 +153,7 @@ public class DatabasesClient {
      * @return FlowProvider created.
      * @throws Exception
      */
-    public FlowProvider createFlowProvider(String aDatasourceName, String aEntityName, String aSqlClause, Fields aExpectedFields) throws Exception {
+    public PlatypusJdbcFlowProvider createFlowProvider(String aDatasourceName, String aEntityName, String aSqlClause, Fields aExpectedFields) throws Exception {
         return new PlatypusJdbcFlowProvider(this, aDatasourceName, aEntityName, obtainDataSource(aDatasourceName), (Runnable aTask) -> {
             startJdbcTask(aTask);
         }, getDbMetadataCache(aDatasourceName), aSqlClause, aExpectedFields, contextHost);
@@ -178,38 +175,48 @@ public class DatabasesClient {
         return sb.toString();
     }
 
-    public static Map<String, String> getUserProperties(DatabasesClient aClient, String aUserName, Consumer<Map<String, String>> onSuccess, Consumer<Exception> onFailure) throws Exception {
-        final SqlQuery q = new SqlQuery(aClient, USER_QUERY_TEXT);
-        q.putParameter(USERNAME_PARAMETER_NAME, DataTypeInfo.VARCHAR, aUserName.toUpperCase());
-        aClient.initUsersSpace(q.getDatasourceName());
-        SqlCompiledQuery compiled = q.compile();
-        CallableConsumer<Map<String, String>, Rowset> doWork = (Rowset rs) -> {
-            Map<String, String> properties = new HashMap<>();
-            if (!rs.isEmpty()) {
-                Row r = rs.getRow(1);
-                properties.put(ClientConstants.F_USR_NAME, aUserName);
-                properties.put(ClientConstants.F_USR_CONTEXT, (String)r.getColumnObject(rs.getFields().find(ClientConstants.F_USR_CONTEXT)));
-                properties.put(ClientConstants.F_USR_EMAIL, (String)r.getColumnObject(rs.getFields().find(ClientConstants.F_USR_EMAIL)));
-                properties.put(ClientConstants.F_USR_PHONE, (String)r.getColumnObject(rs.getFields().find(ClientConstants.F_USR_PHONE)));
-                properties.put(ClientConstants.F_USR_FORM, (String)r.getColumnObject(rs.getFields().find(ClientConstants.F_USR_FORM)));
-                properties.put(ClientConstants.F_USR_PASSWD, (String)r.getColumnObject(rs.getFields().find(ClientConstants.F_USR_PASSWD)));
-            }
-            return properties;
-        };
-        if (onSuccess != null) {
-            compiled.executeQuery((Rowset rs) -> {
-                try {
-                    onSuccess.accept(doWork.call(rs));
-                } catch (Exception ex) {
-                    if (onFailure != null) {
-                        onFailure.accept(ex);
-                    }
+    public static Map<String, String> getUserProperties(DatabasesClient aClient, String aUserName, Scripts.Space aSpace, Consumer<Map<String, String>> onSuccess, Consumer<Exception> onFailure) throws Exception {
+        if (aUserName != null && aClient != null) {
+            final SqlQuery q = new SqlQuery(aClient, USER_QUERY_TEXT);
+            q.putParameter(USERNAME_PARAMETER_NAME, DataTypeInfo.VARCHAR, aUserName.toUpperCase());
+            SqlCompiledQuery compiled = q.compile();
+            CallableConsumer<Map<String, String>, ResultSet> doWork = (ResultSet r) -> {
+                Map<String, String> properties = new HashMap<>();
+                ColumnsIndicies idxs = new ColumnsIndicies(r.getMetaData());
+                if (r.next()) {
+                    properties.put(ClientConstants.F_USR_NAME, aUserName);
+                    properties.put(ClientConstants.F_USR_CONTEXT, r.getString(idxs.find(ClientConstants.F_USR_CONTEXT)));
+                    properties.put(ClientConstants.F_USR_EMAIL, r.getString(idxs.find(ClientConstants.F_USR_EMAIL)));
+                    properties.put(ClientConstants.F_USR_PHONE, r.getString(idxs.find(ClientConstants.F_USR_PHONE)));
+                    properties.put(ClientConstants.F_USR_FORM, r.getString(idxs.find(ClientConstants.F_USR_FORM)));
+                    properties.put(ClientConstants.F_USR_PASSWD, r.getString(idxs.find(ClientConstants.F_USR_PASSWD)));
                 }
-            }, onFailure);
-            return null;
+                return properties;
+            };
+            if (onSuccess != null) {
+                try {
+                    compiled.<Map<String, String>>executeQuery(doWork, (Runnable aTask) -> {
+                        aSpace.process(aTask);
+                    }, onSuccess, onFailure);
+                    return null;
+                } catch (Exception ex) {
+                    aSpace.process(() -> {
+                        onFailure.accept(ex);
+                    });
+                    return null;
+                }
+            } else {
+                return compiled.<Map<String, String>>executeQuery(doWork, null, null, null);
+            }
         } else {
-            final Rowset rs = compiled.executeQuery(null, null);
-            return doWork.call(rs);
+            if (onSuccess != null) {
+                aSpace.process(() -> {
+                    onSuccess.accept(new HashMap<>());
+                });
+                return null;
+            } else {
+                return null;
+            }
         }
     }
 
@@ -240,7 +247,7 @@ public class DatabasesClient {
             }
         }
 
-        public synchronized void complete(Map<String, String> aProps, Set<String> aRoles) {
+        public void complete(Map<String, String> aProps, Set<String> aRoles) {
             if (aProps != null) {
                 props = aProps;
             }
@@ -257,19 +264,19 @@ public class DatabasesClient {
         }
     }
 
-    public static PlatypusPrincipal credentialsToPrincipalWithBasicAuthentication(DatabasesClient aClient, String aUserName, String aPassword, Consumer<PlatypusPrincipal> aOnSuccess, Consumer<Exception> aOnFailure) throws Exception {
+    public static PlatypusPrincipal credentialsToPrincipalWithBasicAuthentication(DatabasesClient aClient, String aUserName, String aPassword, Scripts.Space aSpace, Consumer<PlatypusPrincipal> aOnSuccess, Consumer<Exception> aOnFailure) throws Exception {
         final UserInfo ui = new UserInfo(aUserName, aPassword, aOnSuccess, true);
         if (aOnSuccess != null) {
-            getUserProperties(aClient, aUserName, (Map<String, String> userProperties) -> {
+            getUserProperties(aClient, aUserName, aSpace, (Map<String, String> userProperties) -> {
                 ui.complete(userProperties, null);
             }, aOnFailure);
-            getUserRoles(aClient, aUserName, (Set<String> aRoles) -> {
+            getUserRoles(aClient, aUserName, aSpace, (Set<String> aRoles) -> {
                 ui.complete(null, aRoles);
             }, aOnFailure);
             return null;
         } else {
-            ui.props = getUserProperties(aClient, aUserName, null, null);
-            ui.roles = getUserRoles(aClient, aUserName, null, null);
+            ui.props = getUserProperties(aClient, aUserName, null, null, null);
+            ui.roles = getUserRoles(aClient, aUserName, null, null, null);
             if (aPassword.equals(ui.props.get(ClientConstants.F_USR_PASSWD))) {
                 return ui.principal(aUserName);
             } else {
@@ -278,19 +285,19 @@ public class DatabasesClient {
         }
     }
 
-    public static PlatypusPrincipal userNameToPrincipal(DatabasesClient aClient, String aUserName, Consumer<PlatypusPrincipal> aOnSuccess, Consumer<Exception> aOnFailure) throws Exception {
+    public static PlatypusPrincipal userNameToPrincipal(DatabasesClient aClient, String aUserName, Scripts.Space aSpace, Consumer<PlatypusPrincipal> aOnSuccess, Consumer<Exception> aOnFailure) throws Exception {
         final UserInfo ui = new UserInfo(aUserName, null, aOnSuccess, false);
         if (aOnSuccess != null) {
-            getUserProperties(aClient, aUserName, (Map<String, String> userProperties) -> {
+            getUserProperties(aClient, aUserName, aSpace, (Map<String, String> userProperties) -> {
                 ui.complete(userProperties, null);
             }, aOnFailure);
-            getUserRoles(aClient, aUserName, (Set<String> aRoles) -> {
+            getUserRoles(aClient, aUserName, aSpace, (Set<String> aRoles) -> {
                 ui.complete(null, aRoles);
             }, aOnFailure);
             return null;
         } else {
-            ui.props = getUserProperties(aClient, aUserName, null, null);
-            ui.roles = getUserRoles(aClient, aUserName, null, null);
+            ui.props = getUserProperties(aClient, aUserName, null, null, null);
+            ui.roles = getUserRoles(aClient, aUserName, null, null, null);
             return ui.principal(aUserName);
         }
     }
@@ -298,15 +305,14 @@ public class DatabasesClient {
     public int executeUpdate(SqlCompiledQuery aQuery, Consumer<Integer> onSuccess, Consumer<Exception> onFailure) throws Exception {
         Callable<Integer> doWork = () -> {
             int rowsAffected = 0;
-            Converter converter = getDbMetadataCache(aQuery.getDatabaseId()).getConnectionDriver().getConverter();
-            DataSource dataSource = obtainDataSource(aQuery.getDatabaseId());
+            DataSource dataSource = obtainDataSource(aQuery.getDatasourceName());
             if (dataSource != null) {
                 try (Connection connection = dataSource.getConnection(); PreparedStatement stmt = connection.prepareStatement(aQuery.getSqlClause())) {
                     connection.setAutoCommit(false);
                     Parameters params = aQuery.getParameters();
                     for (int i = 1; i <= params.getParametersCount(); i++) {
                         Parameter param = params.get(i);
-                        converter.convert2JdbcAndAssign(param.getValue(), param.getTypeInfo(), connection, i, stmt);
+                        Converter.convertAndAssign(param.getValue(), param.getTypeInfo(), connection, i, stmt);
                     }
                     try {
                         rowsAffected += stmt.executeUpdate();
@@ -320,31 +326,18 @@ public class DatabasesClient {
             return rowsAffected;
         };
         if (onSuccess != null) {
+            Scripts.Space space = Scripts.getSpace();
             startJdbcTask(() -> {
                 try {
                     Integer affected = doWork.call();
-                    if (ScriptUtils.getGlobalQueue() != null) {
-                        ScriptUtils.getGlobalQueue().accept(() -> {
-                            onSuccess.accept(affected);
-                        });
-                    } else {
-                        final Object lock = ScriptUtils.getLock() != null ? ScriptUtils.getLock() : this;
-                        synchronized (lock) {
-                            onSuccess.accept(affected);
-                        }
-                    }
+                    space.process(() -> {
+                        onSuccess.accept(affected);
+                    });
                 } catch (Exception ex) {
                     if (onFailure != null) {
-                        if (ScriptUtils.getGlobalQueue() != null) {
-                            ScriptUtils.getGlobalQueue().accept(() -> {
-                                onFailure.accept(ex);
-                            });
-                        } else {
-                            final Object lock = ScriptUtils.getLock() != null ? ScriptUtils.getLock() : this;
-                            synchronized (lock) {
-                                onFailure.accept(ex);
-                            }
-                        }
+                        space.process(() -> {
+                            onFailure.accept(ex);
+                        });
                     }
                 }
             });
@@ -354,7 +347,10 @@ public class DatabasesClient {
         }
     }
 
-    public synchronized DatabaseMdCache getDbMetadataCache(String aDatasourceName) throws Exception {
+    public DatabaseMdCache getDbMetadataCache(String aDatasourceName) throws Exception {
+        if (aDatasourceName == null) {
+            aDatasourceName = defaultDatasourceName;
+        }
         if (!mdCaches.containsKey(aDatasourceName)) {
             DatabaseMdCache cache = new DatabaseMdCache(this, aDatasourceName);
             mdCaches.put(aDatasourceName, cache);
@@ -370,26 +366,14 @@ public class DatabasesClient {
     }
 
     private void startJdbcTask(Runnable aTask) {
-        ScriptUtils.incAsyncsCount();
-        Object closureLock = ScriptUtils.getLock();
-        Object closureRequest = ScriptUtils.getRequest();
-        Object closureResponse = ScriptUtils.getResponse();
-        Object closureSession = ScriptUtils.getSession();
-        PlatypusPrincipal closurePrincipal = PlatypusPrincipal.getInstance();
+        Scripts.LocalContext context = Scripts.getContext();
+        context.incAsyncsCount();
         jdbcProcessor.submit(() -> {
-            ScriptUtils.setLock(closureLock);
-            ScriptUtils.setRequest(closureRequest);
-            ScriptUtils.setResponse(closureResponse);
-            ScriptUtils.setSession(closureSession);
-            PlatypusPrincipal.setInstance(closurePrincipal);
+            Scripts.setContext(context);
             try {
                 aTask.run();
             } finally {
-                ScriptUtils.setLock(null);
-                ScriptUtils.setRequest(null);
-                ScriptUtils.setResponse(null);
-                ScriptUtils.setSession(null);
-                PlatypusPrincipal.setInstance(null);
+                Scripts.setContext(null);
             }
         });
     }
@@ -403,7 +387,7 @@ public class DatabasesClient {
         }
 
         @Override
-        public synchronized void complete(Integer aRowsAffected, Exception aFailureCause) {
+        public void complete(Integer aRowsAffected, Exception aFailureCause) {
             rowsAffected += aRowsAffected != null ? aRowsAffected : 0;
             if (aFailureCause != null) {
                 exceptions.add(aFailureCause);
@@ -428,7 +412,7 @@ public class DatabasesClient {
          * @param aFailureCause
          */
         @Override
-        public synchronized void complete(ApplyResult aApplyResult, Exception aFailureCause) {
+        public void complete(ApplyResult aApplyResult, Exception aFailureCause) {
             if (aApplyResult != null) {
                 results.add(aApplyResult);
             }
@@ -443,32 +427,15 @@ public class DatabasesClient {
 
     public int commit(Map<String, List<Change>> aDatasourcesChangeLogs, Consumer<Integer> onSuccess, Consumer<Exception> onFailure) throws Exception {
         if (onSuccess != null) {
+            Scripts.Space space = Scripts.getSpace();
             if (!aDatasourcesChangeLogs.isEmpty()) {
                 ApplyProcess applyProcess = new ApplyProcess(aDatasourcesChangeLogs.size(), (List<ApplyResult> aApplyResults) -> {
                     assert aDatasourcesChangeLogs.size() == aApplyResults.size();
                     CommitProcess commitProcess = new CommitProcess(aApplyResults.size(), (Integer aRowsAffected) -> {
-                        if (ScriptUtils.getGlobalQueue() != null) {
-                            ScriptUtils.getGlobalQueue().accept(() -> {
-                                onSuccess.accept(aRowsAffected);
-                            });
-                        } else {
-                            final Object lock = ScriptUtils.getLock() != null ? ScriptUtils.getLock() : this;
-                            synchronized (lock) {
-                                onSuccess.accept(aRowsAffected);
-                            }
-                        }
+                        onSuccess.accept(aRowsAffected);
                     }, (Exception aFailureCause) -> {
                         if (onFailure != null) {
-                            if (ScriptUtils.getGlobalQueue() != null) {
-                                ScriptUtils.getGlobalQueue().accept(() -> {
-                                    onFailure.accept(aFailureCause);
-                                });
-                            } else {
-                                final Object lock = ScriptUtils.getLock() != null ? ScriptUtils.getLock() : this;
-                                synchronized (lock) {
-                                    onFailure.accept(aFailureCause);
-                                }
-                            }
+                            onFailure.accept(aFailureCause);
                         }
                     });
                     aApplyResults.stream().forEach((ApplyResult aResult) -> {
@@ -476,10 +443,14 @@ public class DatabasesClient {
                             try {
                                 try {
                                     aResult.connection.commit();
-                                    commitProcess.complete(aResult.rowsAffected, null);
+                                    space.process(() -> {
+                                        commitProcess.complete(aResult.rowsAffected, null);
+                                    });
                                 } catch (SQLException ex) {
                                     aResult.connection.rollback();
-                                    commitProcess.complete(null, ex);
+                                    space.process(() -> {
+                                        commitProcess.complete(null, ex);
+                                    });
                                 } finally {
                                     aResult.connection.close();
                                 }
@@ -490,16 +461,18 @@ public class DatabasesClient {
                     });
                 }, null);
                 applyProcess.onFailure = (Exception aFailureCause) -> {
-                    applyProcess.results.stream().forEach((ApplyResult aResult) -> {
-                        try {
+                    startJdbcTask(() -> {
+                        applyProcess.results.stream().forEach((ApplyResult aResult) -> {
                             try {
-                                aResult.connection.rollback();
-                            } finally {
-                                aResult.connection.close();
+                                try {
+                                    aResult.connection.rollback();
+                                } finally {
+                                    aResult.connection.close();
+                                }
+                            } catch (SQLException ex1) {
+                                Logger.getLogger(DatabasesClient.class.getName()).log(Level.SEVERE, null, ex1);
                             }
-                        } catch (SQLException ex1) {
-                            Logger.getLogger(DatabasesClient.class.getName()).log(Level.SEVERE, null, ex1);
-                        }
+                        });
                     });
                     if (onFailure != null) {
                         onFailure.accept(aFailureCause);
@@ -507,7 +480,7 @@ public class DatabasesClient {
                 };
                 aDatasourcesChangeLogs.entrySet().stream().forEach((Map.Entry<String, List<Change>> aLogEntry) -> {
                     try {
-                        apply(aLogEntry.getKey(), aLogEntry.getValue(), (ApplyResult aResult) -> {
+                        apply(aLogEntry.getKey(), aLogEntry.getValue(), space, (ApplyResult aResult) -> {
                             applyProcess.complete(aResult, null);
                         }, (Exception ex) -> {
                             applyProcess.complete(null, ex);
@@ -517,7 +490,9 @@ public class DatabasesClient {
                     }
                 });
             } else {
-                onSuccess.accept(0);
+                space.process(() -> {
+                    onSuccess.accept(0);
+                });
             }
             return 0;
         } else {
@@ -525,7 +500,7 @@ public class DatabasesClient {
             List<ApplyResult> results = new ArrayList<>();
             try {
                 for (Map.Entry<String, List<Change>> logEntry : aDatasourcesChangeLogs.entrySet()) {
-                    results.add(apply(logEntry.getKey(), logEntry.getValue(), null, null));
+                    results.add(apply(logEntry.getKey(), logEntry.getValue(), null, null, null));
                 }
                 for (ApplyResult r : results) {
                     r.connection.commit();
@@ -556,7 +531,7 @@ public class DatabasesClient {
         }
     }
 
-    protected ApplyResult apply(final String aDatasourceName, List<Change> aLog, Consumer<ApplyResult> onSuccess, Consumer<Exception> onFailure) throws Exception {
+    protected ApplyResult apply(final String aDatasourceName, List<Change> aLog, Scripts.Space aSpace, Consumer<ApplyResult> onSuccess, Consumer<Exception> onFailure) throws Exception {
         Callable<ApplyResult> doWork = () -> {
             int rowsAffected;
             DatabaseMdCache mdCache = getDbMetadataCache(aDatasourceName);
@@ -567,26 +542,69 @@ public class DatabasesClient {
             if (driver == null) {
                 throw new IllegalStateException(String.format(UNSUPPORTED_DATASOURCE_IN_COMMIT, aDatasourceName));
             }
-            Converter converter = driver.getConverter();
             assert aLog != null;
             DataSource dataSource = obtainDataSource(aDatasourceName);
             Connection connection = dataSource.getConnection();
             try {
                 connection.setAutoCommit(false);
-                List<StatementsLogEntry> statements = new ArrayList<>();
+                List<StatementsGenerator.StatementsLogEntry> statements = new ArrayList<>();
                 // This structure helps us to avoid actuality check for queries while
                 // processing each statement in transaction. Thus, we can avoid speed degradation.
                 // It doesn't break security, because such "unactual" lookup takes place ONLY
                 // while transaction processing.
                 final Map<String, SqlQuery> entityQueries = new HashMap<>();
                 for (Change change : aLog) {
-                    StatementsGenerator generator = new StatementsGenerator(converter, (String aEntityName, String aFieldName) -> {
-                        if (aEntityName != null) {
+                    StatementsGenerator generator = new StatementsGenerator(new EntitiesHost() {
+
+                        @Override
+                        public Parameter resolveParameter(String aEntityName, String aParamName) throws Exception {
+                            if (aEntityName != null) {
+                                SqlQuery query = query(aEntityName);
+                                if (query != null && query.getEntityName() != null) {
+                                    Parameter p = query.getParameters().get(aParamName);
+                                    return p;
+                                } else {
+                                    return null;
+                                }
+                            } else {
+                                return null;
+                            }
+                        }
+
+                        @Override
+                        public Field resolveField(String aEntityName, String aFieldName) throws Exception {
+                            if (aEntityName != null) {
+                                SqlQuery query = query(aEntityName);
+                                Fields fields;
+                                if (query != null && query.getEntityName() != null) {
+                                    fields = query.getFields();
+                                } else {// It seems, that aEntityName is a table name...
+                                    fields = mdCache.getTableMetadata(aEntityName);
+                                }
+                                if (fields != null) {
+                                    Field resolved = fields.get(aFieldName);
+                                    String resolvedTableName = resolved != null ? resolved.getTableName() : null;
+                                    resolvedTableName = resolvedTableName != null ? resolvedTableName.toLowerCase() : "";
+                                    if (query != null && query.getWritable() != null && !query.getWritable().contains(resolvedTableName)) {
+                                        return null;
+                                    } else {
+                                        return resolved;
+                                    }
+                                } else {
+                                    Logger.getLogger(DatabasesClient.class.getName()).log(Level.WARNING, "Cant find fields for entity id:{0}", aEntityName);
+                                    return null;
+                                }
+                            } else {
+                                return null;
+                            }
+                        }
+
+                        private SqlQuery query(String aEntityName) throws Exception {
                             SqlQuery query;
                             if (queries != null) {
                                 query = entityQueries.get(aEntityName);
                                 if (query == null) {
-                                    query = queries.getQuery(aEntityName, null, null);
+                                    query = queries.getQuery(aEntityName, null, null, null);
                                     if (query != null) {
                                         entityQueries.put(aEntityName, query);
                                     }
@@ -594,27 +612,7 @@ public class DatabasesClient {
                             } else {
                                 query = null;
                             }
-                            Fields fields;
-                            if (query != null && query.getEntityId() != null) {
-                                fields = query.getFields();
-                            } else {// It seems, that aEntityId is a table name...
-                                fields = mdCaches.get(aDatasourceName).getTableMetadata(aEntityName);
-                            }
-                            if (fields != null) {
-                                Field resolved = fields.get(aFieldName);
-                                String resolvedTableName = resolved != null ? resolved.getTableName() : null;
-                                resolvedTableName = resolvedTableName != null ? resolvedTableName.toLowerCase() : "";
-                                if (query != null && query.getWritable() != null && !query.getWritable().contains(resolvedTableName)) {
-                                    return null;
-                                } else {
-                                    return resolved;
-                                }
-                            } else {
-                                Logger.getLogger(DatabasesClient.class.getName()).log(Level.WARNING, "Cant find fields for entity id:{0}", aEntityName);
-                                return null;
-                            }
-                        } else {
-                            return null;
+                            return query;
                         }
                     }, ClientConstants.F_USR_CONTEXT, contextHost != null ? contextHost.preparationContext() : null);
                     change.accept(generator);
@@ -633,13 +631,17 @@ public class DatabasesClient {
                 try {
                     ApplyResult applyResult = doWork.call();
                     try {// We have to handle commit exceptions and onSuccess.accept() exceptions separatly.
-                        onSuccess.accept(applyResult);
+                        aSpace.process(() -> {
+                            onSuccess.accept(applyResult);
+                        });
                     } catch (Exception ex) {
                         Logger.getLogger(DatabasesClient.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 } catch (Exception ex) {
                     if (onFailure != null) {
-                        onFailure.accept(ex);
+                        aSpace.process(() -> {
+                            onFailure.accept(ex);
+                        });
                     }
                 }
             });
@@ -651,32 +653,9 @@ public class DatabasesClient {
     protected static final String UNKNOWN_DATASOURCE_IN_COMMIT = "Unknown datasource: %s. Can't commit to it.";
     protected static final String UNSUPPORTED_DATASOURCE_IN_COMMIT = "Unsupported datasource: %s. Can't commit to it.";
 
-    public Rowset getDbTypesInfo(String aDatasourceId) throws Exception {
-        Logger.getLogger(DatabasesClient.class.getName()).fine(String.format(TYPES_INFO_TRACE_MSG, aDatasourceId));
-        Rowset lrowSet = new Rowset();
-        JdbcReader rsReader = new JdbcReader(getDbMetadataCache(aDatasourceId).getConnectionDriver().getConverter());
-        DataSource dataSource = obtainDataSource(aDatasourceId);
-        if (dataSource != null) {
-            try (Connection lconn = dataSource.getConnection()) {
-                DatabaseMetaData dbmd = lconn.getMetaData();
-                if (dbmd != null) {
-                    try (ResultSet rs = dbmd.getTypeInfo()) {
-                        lrowSet = rsReader.readRowset(rs, null, -1);
-                    }
-                }
-            }
-        }
-        return lrowSet;
-    }
-
     public void dbTableChanged(String aDatasourceName, String aSchema, String aTable) throws Exception {
         DatabaseMdCache cache = getDbMetadataCache(aDatasourceName);
-        String fullTableName = aTable;
-        if (aSchema != null && !aSchema.isEmpty()) {
-            fullTableName = aSchema + "." + fullTableName;
-        }
-        cache.removeTableMetadata(fullTableName);
-        cache.removeTableIndexes(fullTableName);
+        cache.removeSchema(aSchema);
     }
 
     public String getConnectionSchema(String aDatasourceName) throws Exception {
@@ -704,12 +683,13 @@ public class DatabasesClient {
         }
     }
 
-    protected static Set<String> getUserRoles(DatabasesClient aClient, String aUserName, Consumer<Set<String>> onSuccess, Consumer<Exception> onFailure) throws Exception {
-        CallableConsumer<Set<String>, Rowset> doWork = (Rowset rs) -> {
+    protected static Set<String> getUserRoles(DatabasesClient aClient, String aUserName, Scripts.Space aSpace, Consumer<Set<String>> onSuccess, Consumer<Exception> onFailure) throws Exception {
+        CallableConsumer<Set<String>, ResultSet> doWork = (ResultSet rs) -> {
             Set<String> roles = new HashSet<>();
-            int roleNameColumnIndex = rs.getFields().find(ClientConstants.F_GROUP_NAME);
-            for (int i = 1; i <= rs.size(); i++) {
-                roles.add((String) rs.getRow(i).getColumnObject(roleNameColumnIndex));
+            ColumnsIndicies idxs = new ColumnsIndicies(rs.getMetaData());
+            int roleNameColumnIndex = idxs.find(ClientConstants.F_GROUP_NAME);
+            while (rs.next()) {
+                roles.add(rs.getString(roleNameColumnIndex));
             }
             return roles;
         };
@@ -717,28 +697,23 @@ public class DatabasesClient {
         q.putParameter(USERNAME_PARAMETER_NAME, DataTypeInfo.VARCHAR, aUserName.toUpperCase());
         SqlCompiledQuery compiled = q.compile();
         if (onSuccess != null) {
-            compiled.executeQuery((Rowset rs) -> {
-                try {
-                    onSuccess.accept(doWork.call(rs));
-                } catch (Exception ex) {
-                    if (onFailure != null) {
-                        onFailure.accept(ex);
-                    }
-                }
+            compiled.<Set<String>>executeQuery(doWork, (Runnable aTask) -> {
+                aSpace.process(aTask);
+            }, (Set<String> aRoles) -> {
+                onSuccess.accept(aRoles);
             }, onFailure);
             return null;
         } else {
-            Rowset rs = compiled.executeQuery(null, null);
-            return doWork.call(rs);
+            return compiled.<Set<String>>executeQuery(doWork, null, null, null);
         }
     }
 
-    private int riddleStatements(List<StatementsLogEntry> aStatements, Connection aConnection) throws Exception {
+    private int riddleStatements(List<StatementsGenerator.StatementsLogEntry> aStatements, Connection aConnection) throws Exception {
         int rowsAffected = 0;
         if (!aStatements.isEmpty()) {
-            List<StatementsLogEntry> errorStatements = new ArrayList<>();
+            List<StatementsGenerator.StatementsLogEntry> errorStatements = new ArrayList<>();
             List<String> errors = new ArrayList<>();
-            for (StatementsLogEntry entry : aStatements) {
+            for (StatementsGenerator.StatementsLogEntry entry : aStatements) {
                 try {
                     rowsAffected += entry.apply(aConnection);
                 } catch (Exception ex) {

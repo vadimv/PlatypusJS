@@ -4,19 +4,14 @@
  */
 package com.eas.client.threetier.platypus;
 
-import com.bearsoft.rowset.changes.serial.ChangesReader;
-import com.bearsoft.rowset.exceptions.RowsetException;
-import com.bearsoft.rowset.metadata.Parameter;
-import com.bearsoft.rowset.metadata.Parameters;
-import com.bearsoft.rowset.serial.CustomSerializer;
-import com.eas.client.threetier.PlatypusRowsetReader;
+import com.eas.client.metadata.Parameter;
 import com.eas.client.threetier.Request;
 import com.eas.client.threetier.requests.AppQueryRequest;
 import com.eas.client.threetier.requests.CommitRequest;
-import com.eas.client.threetier.requests.CreateServerModuleRequest;
+import com.eas.client.threetier.requests.ServerModuleStructureRequest;
 import com.eas.client.threetier.requests.DisposeServerModuleRequest;
 import com.eas.client.threetier.requests.ExecuteQueryRequest;
-import com.eas.client.threetier.requests.ExecuteServerModuleMethodRequest;
+import com.eas.client.threetier.requests.RPCRequest;
 import com.eas.client.threetier.requests.LogoutRequest;
 import com.eas.client.threetier.requests.ModuleStructureRequest;
 import com.eas.client.threetier.requests.PlatypusRequestVisitor;
@@ -28,12 +23,12 @@ import com.eas.proto.ProtoReader;
 import com.eas.proto.ProtoReaderException;
 import com.eas.proto.dom.ProtoDOMBuilder;
 import com.eas.proto.dom.ProtoNode;
-import com.eas.script.ScriptUtils;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -115,7 +110,7 @@ public class PlatypusRequestReader implements PlatypusRequestVisitor {
     }
 
     @Override
-    public void visit(CreateServerModuleRequest rq) throws Exception {
+    public void visit(ServerModuleStructureRequest rq) throws Exception {
         final ProtoNode dom = ProtoDOMBuilder.buildDOM(bytes);
         if (!dom.containsChild(RequestsTags.TAG_MODULE_NAME)) {
             throw new ProtoReaderException("Module name not specified.");
@@ -132,15 +127,11 @@ public class PlatypusRequestReader implements PlatypusRequestVisitor {
 
     @Override
     public void visit(CommitRequest rq) throws Exception {
-        ProtoReader reader = new ProtoReader(new ByteArrayInputStream(bytes));
-        rq.setChanges(null);
-        do {
-            switch (reader.getNextTag()) {
-                case RequestsTags.TAG_CHANGES:
-                    rq.setChanges(ChangesReader.read(reader.getSubStreamData(), customReadersContainer));
-                    break;
-            }
-        } while (reader.getCurrentTag() != CoreTags.TAG_EOF);
+        ProtoNode dom = ProtoDOMBuilder.buildDOM(bytes);
+        if (!dom.containsChild(RequestsTags.TAG_CHANGES)) {
+            throw new NullPointerException("No changes specified");
+        }
+        rq.setChangesJson(dom.getChild(RequestsTags.TAG_CHANGES).getString());
     }
 
     @Override
@@ -153,10 +144,10 @@ public class PlatypusRequestReader implements PlatypusRequestVisitor {
     }
 
     @Override
-    public void visit(ExecuteServerModuleMethodRequest rq) throws Exception {
+    public void visit(RPCRequest rq) throws Exception {
         final ProtoNode input = ProtoDOMBuilder.buildDOM(bytes);
         final Iterator<ProtoNode> it = input.iterator();
-        final List<Object> args = new ArrayList<>();
+        final List<String> args = new ArrayList<>();
         while (it.hasNext()) {
             final ProtoNode node = it.next();
             switch (node.getNodeTag()) {
@@ -167,15 +158,13 @@ public class PlatypusRequestReader implements PlatypusRequestVisitor {
                     rq.setMethodName(node.getString());
                     break;
                 case RequestsTags.TAG_ARGUMENT_VALUE: {
-                    args.add(ScriptUtils.parseDates(ScriptUtils.parseJson(node.getString())));
+                    args.add(node.getString());
                     break;
                 }
             }
         }
-        rq.setArguments(args.toArray());
+        rq.setArgumentsJsons(args.toArray(new String[]{}));
     }
-
-    private static final PlatypusRowsetReader customReadersContainer = new PlatypusRowsetReader(null);
 
     public static Parameter readParameter(ProtoNode node) throws ProtoReaderException {
         Parameter param = new Parameter();
@@ -214,16 +203,7 @@ public class PlatypusRequestReader implements PlatypusRequestVisitor {
         value = null;
         if (node.containsChild(RequestsTags.TAG_SQL_PARAMETER_VALUE)) {
             ProtoNode valueNode = node.getChild(RequestsTags.TAG_SQL_PARAMETER_VALUE);
-            CustomSerializer serializer = customReadersContainer.getSerializer(param.getTypeInfo());
-            if (serializer != null) {
-                try {
-                    value = serializer.deserialize(valueNode.getData(), valueNode.getOffset(), valueNode.getSize(), param.getTypeInfo());
-                } catch (RowsetException ex) {
-                    throw new ProtoReaderException(ex);
-                }
-            } else {
-                value = valueNode.getJDBCCompatible(paramType);
-            }
+            value = valueNode.getJDBCCompatible(paramType);
         }
         param.setName(paramName);
         param.setValue(value);
@@ -233,20 +213,19 @@ public class PlatypusRequestReader implements PlatypusRequestVisitor {
 
     @Override
     public void visit(ExecuteQueryRequest rq) throws Exception {
-        rq.setParams(new Parameters());
+        Map<String, String> params = new HashMap<>();
         ProtoNode dom = ProtoDOMBuilder.buildDOM(bytes);
         if (!dom.containsChild(RequestsTags.TAG_QUERY_ID)) {
-            throw new NullPointerException("No query specified");
+            throw new NullPointerException("No query name specified");
         }
         rq.setQueryName(dom.getChild(RequestsTags.TAG_QUERY_ID).getString());
-        Iterator<ProtoNode> it = dom.iterator();
-        while (it.hasNext()) {
-            ProtoNode node = it.next();
-            if (node.getNodeTag() == RequestsTags.TAG_SQL_PARAMETER) {
-                Parameter param = readParameter(node);
-                rq.getParams().add(param);
-            }
+        List<ProtoNode> parametersNodes = dom.getChildren(RequestsTags.TAG_SQL_PARAMETER);
+        for (ProtoNode paramNode : parametersNodes) {
+            String paramName = paramNode.getChild(RequestsTags.TAG_SQL_PARAMETER_NAME).getString();
+            String paramValue = paramNode.getChild(RequestsTags.TAG_SQL_PARAMETER_VALUE).getString();
+            params.put(paramName, paramValue);
         }
+        rq.setParamsJsons(params);
     }
 
     @Override

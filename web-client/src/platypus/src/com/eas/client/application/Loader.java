@@ -6,24 +6,24 @@ package com.eas.client.application;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.bearsoft.rowset.CallbackAdapter;
-import com.bearsoft.rowset.Cancellable;
-import com.bearsoft.rowset.utils.IDGenerator;
+import com.eas.client.CallbackAdapter;
+import com.eas.client.Cancellable;
 import com.eas.client.CumulativeCallbackAdapter;
-import com.eas.client.PlatypusHttpRequestParams;
 import com.eas.client.queries.Query;
 import com.eas.client.xhr.UrlQueryProcessor;
 import com.google.gwt.core.client.Callback;
 import com.google.gwt.core.client.GWT;
+import com.google.gwt.core.client.Scheduler;
 import com.google.gwt.core.client.ScriptInjector;
 import com.google.gwt.event.shared.HandlerRegistration;
-import com.google.gwt.user.client.Window;
 import com.google.gwt.xhr.client.XMLHttpRequest;
 import com.google.gwt.xml.client.Document;
 
@@ -82,6 +82,8 @@ public class Loader {
 	protected AppClient client;
 	protected Set<LoadHandler> handlers = new HashSet<LoadHandler>();
 	protected Set<String> started = new HashSet<>();
+	protected Set<String> executed = new HashSet<>();
+	protected Map<String, List<Callback<Void, String>>> pending = new HashMap<>();
 
 	public Loader(AppClient aClient) {
 		client = aClient;
@@ -109,151 +111,183 @@ public class Loader {
 		};
 	}
 
-	public void load(final Collection<String> aModulesNames, final Callback<Void, String> aCallback) throws Exception {
-		final Collection<Cancellable> loadingsStarted = new ArrayList<Cancellable>();
-		List<String> modulesNames = new ArrayList<String>();
-		// Recursion handling
-		for (String moduleName : aModulesNames) {
-			if (!isStarted(moduleName)) {
-				modulesNames.add(moduleName);
-			}
-		}
-		if (!modulesNames.isEmpty()) {
-			final CumulativeCallbackAdapter<Void, String> process = new CumulativeCallbackAdapter<Void, String>(modulesNames.size()) {
-	
+	public void load(final Collection<String> aModulesNames, final Callback<Void, String> aCallback, final Set<String> aCyclic) throws Exception {		
+		if (!aModulesNames.isEmpty()) {
+			final CumulativeCallbackAdapter<String> process = new CumulativeCallbackAdapter<String>(aModulesNames.size()) {
+
 				@Override
 				protected void failed(List<String> aReasons) {
 					if (aCallback != null) {
 						aCallback.onFailure(aReasons.toString());
 					}
 				}
-	
+
 				@Override
 				protected void doWork(Void aResult) throws Exception {
 					if (aCallback != null)
 						aCallback.onSuccess(null);
 				}
-	
+
 			};
-			for (final String moduleName : modulesNames) {
-				loadingsStarted.add(client.requestModuleStructure(moduleName, new CallbackAdapter<AppClient.ModuleStructure, XMLHttpRequest>() {
+			for (final String moduleName : aModulesNames) {
+				if (executed.contains(moduleName) || aCyclic.contains(moduleName)) {
+					Scheduler.get().scheduleDeferred(new Scheduler.ScheduledCommand() {
 
-					@Override
-					protected void doWork(AppClient.ModuleStructure aStructure) throws Exception {
-						final CumulativeCallbackAdapter<Void, String> moduleProcess = new CumulativeCallbackAdapter<Void, String>(2) {
-
-							@Override
-							protected void failed(List<String> aReasons) {
-								process.onFailure(aReasons.toString());
-							}
-
-							@Override
-							protected void doWork(Void aResult) throws Exception {
-								fireLoaded(moduleName);
-								process.onSuccess(null);
-							}
-
-						};
-						final CumulativeCallbackAdapter<Void, String> structureProcess = new CumulativeCallbackAdapter<Void, String>(aStructure.getStructure().size()) {
-
-							@Override
-							protected void failed(List<String> aReasons) {
-								moduleProcess.onFailure(aReasons.toString());
-							}
-
-							@Override
-							protected void doWork(Void aResult) throws Exception {
-								moduleProcess.onSuccess(null);
-							}
-
-						};
-						assert !aStructure.getStructure().isEmpty() : "Module ["+moduleName+"] structure should contain at least one element.";
-						for (String part : aStructure.getStructure()) {
-							if (part.toLowerCase().endsWith(".js")) {
-								String jsURL = AppClient.appendCacheBustParameter(AppClient.relativeUri() + AppClient.APP_RESOURCE_PREFIX + part, "?");
-								ScriptInjector.fromUrl(jsURL).setCallback(new Callback<Void, Exception>() {
-
-									@Override
-									public void onSuccess(Void result) {
-										structureProcess.onSuccess(result);
-									}
-
-									@Override
-									public void onFailure(Exception reason) {
-										Logger.getLogger(Loader.class.getName()).log(Level.SEVERE, "Script [" + moduleName + "] is not loaded. Cause is: " + reason.getMessage());
-										structureProcess.onFailure(reason.getMessage());
-									}
-
-								}).setWindow(ScriptInjector.TOP_WINDOW).setRemoveTag(true).inject();
-							} else {
-								client.requestDocument(part, new CallbackAdapter<Document, XMLHttpRequest>() {
-
-									@Override
-									public void onFailure(XMLHttpRequest reason) {
-										structureProcess.onFailure(reason.getStatus() + " : " + reason.getStatusText());
-									}
-
-									@Override
-									protected void doWork(Document aResult) throws Exception {
-										structureProcess.onSuccess(null);
-									}
-
-								});
-							}
+						@Override
+						public void execute() {
+							process.onSuccess(null);
 						}
-						final CumulativeCallbackAdapter<Void, String> dependenciesProcess = new CumulativeCallbackAdapter<Void, String>(3) {
+					});
+				} else {
+					aCyclic.add(moduleName);
+					List<Callback<Void, String>> pendingOnModule = pending.get(moduleName);
+					if (pendingOnModule == null) {
+						pendingOnModule = new ArrayList<>();
+						pending.put(moduleName, pendingOnModule);
+					}
+					pendingOnModule.add(process);
+					if (!started.contains(moduleName)) {
+						client.requestModuleStructure(moduleName, new CallbackAdapter<AppClient.ModuleStructure, XMLHttpRequest>() {
 
 							@Override
-							protected void failed(List<String> aReasons) {
-								moduleProcess.onFailure(aReasons.toString());
+							protected void doWork(AppClient.ModuleStructure aStructure) throws Exception {
+								final CumulativeCallbackAdapter<String> moduleProcess = new CumulativeCallbackAdapter<String>(2) {
+
+									@Override
+									protected void failed(final List<String> aReasons) {
+										List<Callback<Void, String>> interestedPendings = new ArrayList<>(pending.get(moduleName));
+										pending.get(moduleName).clear();
+										for (final Callback<Void, String> interestedPending : interestedPendings) {
+											Scheduler.get().scheduleDeferred(new Scheduler.ScheduledCommand() {
+
+												@Override
+												public void execute() {
+													interestedPending.onFailure(aReasons.toString());
+												}
+											});
+										}
+									}
+
+									@Override
+									protected void doWork(Void aResult) throws Exception {
+										executed.add(moduleName);
+										fireLoaded(moduleName);
+										List<Callback<Void, String>> interestedPendings = new ArrayList<>(pending.get(moduleName));
+										pending.get(moduleName).clear();
+										for (final Callback<Void, String> interestedPending : interestedPendings) {
+											Scheduler.get().scheduleDeferred(new Scheduler.ScheduledCommand() {
+
+												@Override
+												public void execute() {
+													interestedPending.onSuccess(null);
+												}
+											});
+										}
+									}
+
+								};
+								final CumulativeCallbackAdapter<String> structureProcess = new CumulativeCallbackAdapter<String>(aStructure.getStructure().size()) {
+
+									@Override
+									protected void failed(List<String> aReasons) {
+										moduleProcess.onFailure(aReasons.toString());
+									}
+
+									@Override
+									protected void doWork(Void aResult) throws Exception {
+										moduleProcess.onSuccess(null);
+									}
+
+								};
+								assert !aStructure.getStructure().isEmpty() : "Module [" + moduleName + "] structure should contain at least one element.";
+								for (final String part : aStructure.getStructure()) {
+									if (part.toLowerCase().endsWith(".js")) {
+										final String jsURL = AppClient.checkedCacheBust(AppClient.relativeUri() + AppClient.APP_RESOURCE_PREFIX + part);
+										ScriptInjector.fromUrl(jsURL).setCallback(new Callback<Void, Exception>() {
+
+											@Override
+											public void onSuccess(Void result) {
+												structureProcess.onSuccess(result);
+											}
+
+											@Override
+											public void onFailure(Exception reason) {
+												Logger.getLogger(Loader.class.getName()).log(Level.SEVERE, "Script [" + moduleName + "] is not loaded. Cause is: " + reason.getMessage());
+												structureProcess.onFailure(reason.getMessage());
+											}
+
+										}).setWindow(ScriptInjector.TOP_WINDOW).setRemoveTag(true).inject();
+									} else {
+										client.requestDocument(part, new CallbackAdapter<Document, XMLHttpRequest>() {
+
+											@Override
+											public void onFailure(XMLHttpRequest reason) {
+												structureProcess.onFailure(reason.getStatus() + " : " + reason.getStatusText());
+											}
+
+											@Override
+											protected void doWork(Document aResult) throws Exception {
+												structureProcess.onSuccess(null);
+											}
+
+										});
+									}
+								}
+								final CumulativeCallbackAdapter<String> dependenciesProcess = new CumulativeCallbackAdapter<String>(3) {
+
+									@Override
+									protected void failed(List<String> aReasons) {
+										moduleProcess.onFailure(aReasons.toString());
+									}
+
+									@Override
+									protected void doWork(Void aResult) throws Exception {
+										moduleProcess.onSuccess(null);
+									}
+
+								};
+								load(aStructure.getClientDependencies(), dependenciesProcess, aCyclic);
+								loadQueries(aStructure.getQueriesDependencies(), dependenciesProcess);
+								loadServerModules(aStructure.getServerDependencies(), dependenciesProcess);
 							}
 
 							@Override
-							protected void doWork(Void aResult) throws Exception {
-								moduleProcess.onSuccess(null);
+							public void onFailure(XMLHttpRequest reason) {
+								process.onFailure(reason.getStatus() + ": " + reason.getStatusText());
 							}
-
-						};
-						load(aStructure.getClientDependencies(), dependenciesProcess);
-						loadQueries(aStructure.getQueriesDependencies(), dependenciesProcess);
-						loadServerModules(aStructure.getServerDependencies(), dependenciesProcess);
+						});
+						started.add(moduleName);
+						fireStarted(moduleName);
 					}
-
-					@Override
-					public void onFailure(XMLHttpRequest reason) {
-						process.onFailure(reason.getStatus() + ": " + reason.getStatusText());
-					}
-				}));
-				//
-				started.add(moduleName);
-				fireStarted(moduleName);
+				}
 			}
 		} else {
-			aCallback.onSuccess(null);
+			Scheduler.get().scheduleDeferred(new Scheduler.ScheduledCommand() {
+
+				@Override
+				public void execute() {
+					aCallback.onSuccess(null);
+				}
+			});
 		}
 	}
 
 	private void loadServerModules(Collection<String> aServerModulesNames, final Callback<Void, String> aCallback) throws Exception {
-		List<String> serverModulesNames = new ArrayList<String>();
-		for (String serverModuleName : aServerModulesNames) {
-			if (!isStarted(SERVER_MODULE_TOUCHED_NAME + serverModuleName))
-				serverModulesNames.add(serverModuleName);
-		}
-		if (!serverModulesNames.isEmpty()) {
-			final CumulativeCallbackAdapter<Void, String> process = new CumulativeCallbackAdapter<Void, String>(serverModulesNames.size()) {
+		if (!aServerModulesNames.isEmpty()) {
+			final CumulativeCallbackAdapter<String> process = new CumulativeCallbackAdapter<String>(aServerModulesNames.size()) {
 
 				@Override
-                protected void failed(List<String> aReasons) {
+				protected void failed(List<String> aReasons) {
 					aCallback.onFailure(aReasons.toString());
-                }
+				}
 
 				@Override
-                protected void doWork(Void aResult) throws Exception {
+				protected void doWork(Void aResult) throws Exception {
 					aCallback.onSuccess(aResult);
-                }
+				}
 			};
 			final Collection<Cancellable> startLoadings = new ArrayList<Cancellable>();
-			for (final String appElementName : serverModulesNames) {
+			for (final String appElementName : aServerModulesNames) {
 				startLoadings.add(client.createServerModule(appElementName, new CallbackAdapter<Void, String>() {
 
 					@Override
@@ -268,11 +302,16 @@ public class Loader {
 						process.onFailure(reason);
 					}
 				}));
-				started.add(SERVER_MODULE_TOUCHED_NAME + appElementName);
 				fireStarted(SERVER_MODULE_TOUCHED_NAME + appElementName);
 			}
 		} else {
-			aCallback.onSuccess(null);
+			Scheduler.get().scheduleDeferred(new Scheduler.ScheduledCommand() {
+
+				@Override
+				public void execute() {
+					aCallback.onSuccess(null);
+				}
+			});
 		}
 	}
 
@@ -285,27 +324,22 @@ public class Loader {
 	 * @throws Exception
 	 */
 	public void loadQueries(Collection<String> aQueriesNames, final Callback<Void, String> aCallback) throws Exception {
-		List<String> queriesNames = new ArrayList<String>();
-		for (String queryName : aQueriesNames) {
-			if (!isStarted(queryName))
-				queriesNames.add(queryName);
-		}
-		if (!queriesNames.isEmpty()) {
-			final CumulativeCallbackAdapter<Void, String> process = new CumulativeCallbackAdapter<Void, String>(queriesNames.size()) {
+		if (!aQueriesNames.isEmpty()) {
+			final CumulativeCallbackAdapter<String> process = new CumulativeCallbackAdapter<String>(aQueriesNames.size()) {
 
 				@Override
-	            protected void failed(List<String> aReasons) {
+				protected void failed(List<String> aReasons) {
 					aCallback.onFailure(aReasons.toString());
-	            }
+				}
 
 				@Override
-	            protected void doWork(Void aResult) throws Exception {
+				protected void doWork(Void aResult) throws Exception {
 					aCallback.onSuccess(aResult);
-	            }
+				}
 
 			};
 			final Collection<Cancellable> startLoadings = new ArrayList<Cancellable>();
-			for (final String queryName : queriesNames) {
+			for (final String queryName : aQueriesNames) {
 				startLoadings.add(client.getAppQuery(queryName, new CallbackAdapter<Query, String>() {
 
 					@Override
@@ -321,23 +355,16 @@ public class Loader {
 						process.onFailure(reason);
 					}
 				}));
-				started.add(queryName);
 				fireStarted(queryName);
 			}
 		} else {
-			aCallback.onSuccess(null);
+			Scheduler.get().scheduleDeferred(new Scheduler.ScheduledCommand() {
+
+				@Override
+				public void execute() {
+					aCallback.onSuccess(null);
+				}
+			});
 		}
 	}
-
-	public boolean isStarted(String aAppElementId) {
-		return started.contains(aAppElementId);
-	}
-
-	/*
-	 * public boolean isLoaded(Set<String> aAppElementsIds) { return
-	 * loadedAppElements.containsAll(aAppElementsIds); }
-	 * 
-	 * public boolean isLoaded(String aAppElementId) { return
-	 * loadedAppElements.contains(aAppElementId); }
-	 */
 }

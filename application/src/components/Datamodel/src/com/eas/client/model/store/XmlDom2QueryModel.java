@@ -4,11 +4,11 @@
  */
 package com.eas.client.model.store;
 
-import com.bearsoft.rowset.metadata.Fields;
-import com.bearsoft.rowset.metadata.Parameter;
-import com.bearsoft.rowset.metadata.Parameters;
 import com.eas.client.DatabasesClient;
 import com.eas.client.SqlQuery;
+import com.eas.client.metadata.Fields;
+import com.eas.client.metadata.Parameter;
+import com.eas.client.metadata.Parameters;
 import com.eas.client.model.Relation;
 import com.eas.client.model.query.QueryEntity;
 import com.eas.client.model.query.QueryModel;
@@ -166,7 +166,7 @@ public class XmlDom2QueryModel extends XmlDom2Model<QueryEntity, QueryModel> imp
         }
         aModel.getEntities().values().stream().forEach((e) -> {
             try {
-                aModel.getQueries().getQuery(e.getQueryName(), null, null);
+                aModel.getQueries().getQuery(e.getQueryName(), null, null, null);
                 e.validateQuery();
             } catch (Exception ex) {
                 Logger.getLogger(XmlDom2QueryModel.class.getName()).log(Level.SEVERE, null, ex);

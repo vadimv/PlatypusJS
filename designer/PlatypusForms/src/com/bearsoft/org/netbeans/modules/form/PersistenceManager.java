@@ -60,6 +60,7 @@ import com.bearsoft.org.netbeans.modules.form.layoutsupport.delegates.SplitPaneS
 import com.bearsoft.org.netbeans.modules.form.layoutsupport.delegates.TabbedPaneSupport;
 import com.eas.client.forms.Form;
 import com.eas.client.forms.FormFactory;
+import com.eas.client.forms.Forms;
 import com.eas.client.forms.HasChildren;
 import com.eas.client.forms.HorizontalPosition;
 import com.eas.client.forms.Orientation;
@@ -83,6 +84,7 @@ import com.eas.client.settings.SettingsConstants;
 import com.eas.designer.application.PlatypusUtils;
 import com.eas.designer.application.module.EntityJSObject;
 import com.eas.gui.ScriptColor;
+import com.eas.script.Scripts;
 import com.eas.xml.dom.Source2XmlDom;
 import com.eas.xml.dom.XmlDom2String;
 import java.awt.BorderLayout;
@@ -96,6 +98,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.function.Consumer;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
 import javax.xml.parsers.DocumentBuilder;
@@ -132,12 +135,12 @@ public class PersistenceManager {
             FormFactory formFactory = new FormFactory(doc.getDocumentElement(), formDataObject.getModel().getPublished()) {
 
                 @Override
-                protected ImageIcon resolveIcon(String aIconName) {
+                protected void resolveIcon(String aIconName, Consumer<ImageIcon> onLoad, Consumer<Exception> onFailure) {
                     try {
-                        return IconEditor.iconFromResourceName(formDataObject, aIconName);
+                        NbImageIcon loaded = IconEditor.iconFromResourceName(formDataObject, aIconName);
+                        onLoad.accept(loaded);
                     } catch (Exception ex) {
                         nonfatalErrors.add(ex);
-                        return null;
                     }
                 }
 

@@ -5,8 +5,8 @@
  */
 package com.eas.client.cache;
 
-import com.bearsoft.rowset.changes.Change;
-import com.bearsoft.rowset.metadata.Parameters;
+import com.eas.client.changes.Change;
+import com.eas.script.Scripts;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -16,5 +16,5 @@ import java.util.function.Consumer;
  */
 public interface ServerDataStorage {
 
-    public int commit(List<Change> aLog, Consumer<Integer> onSuccess, Consumer<Exception> onFailure) throws Exception;
+    public int commit(List<Change> aLog, Scripts.Space aSpace, Consumer<Integer> onSuccess, Consumer<Exception> onFailure) throws Exception;
 }

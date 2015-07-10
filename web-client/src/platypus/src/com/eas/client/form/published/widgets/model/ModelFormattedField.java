@@ -4,7 +4,7 @@ import java.text.ParseException;
 
 import com.bearsoft.gwt.ui.widgets.FormattedObjectBox;
 import com.bearsoft.gwt.ui.widgets.ObjectFormat;
-import com.bearsoft.rowset.Utils;
+import com.eas.client.Utils;
 import com.eas.client.converters.DateValueConverter;
 import com.eas.client.converters.DoubleValueConverter;
 import com.eas.client.converters.StringValueConverter;
@@ -161,6 +161,14 @@ public class ModelFormattedField extends ModelDecoratorBox<Object> implements Ha
 				aWidget.@com.eas.client.form.published.widgets.model.ModelFormattedField::setJsValue(Ljava/lang/Object;)($wnd.P.boxAsJava(aValue));
 			}
 		});
+		Object.defineProperty(aPublished, "valueType", {
+			get : function() {
+				return $wnd.P.boxAsJs(aWidget.@com.eas.client.form.published.widgets.model.ModelFormattedField::getValueType()());
+			},
+			set : function(aValue) {
+				aWidget.@com.eas.client.form.published.widgets.model.ModelFormattedField::setValueType(I)(aValue != null ? aValue : null);
+			}
+		});
 		Object.defineProperty(aPublished, "text", {
 			get : function() {
 				return aWidget.@com.eas.client.form.published.widgets.model.ModelFormattedField::getText()();
@@ -208,4 +216,14 @@ public class ModelFormattedField extends ModelDecoratorBox<Object> implements Ha
 		super.clearValue();
 		ActionEvent.fire(this, this);
 	}
+
+	@Override
+    protected void setReadonly(boolean aValue) {
+		((FormattedObjectBox)decorated).getElement().setPropertyBoolean("readOnly", aValue);
+    }
+
+	@Override
+    protected boolean isReadonly() {
+		return ((FormattedObjectBox)decorated).getElement().getPropertyBoolean("readOnly");
+    }
 }

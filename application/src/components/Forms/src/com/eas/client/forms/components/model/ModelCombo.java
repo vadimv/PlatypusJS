@@ -4,6 +4,7 @@
  */
 package com.eas.client.forms.components.model;
 
+import com.eas.client.forms.Forms;
 import com.eas.client.forms.components.rt.HasEditable;
 import com.eas.client.forms.components.rt.HasEmptyText;
 import com.eas.client.forms.components.rt.VComboBox;
@@ -12,6 +13,7 @@ import com.eas.design.Undesignable;
 import com.eas.script.HasPublished;
 import com.eas.script.NoPublisherException;
 import com.eas.script.ScriptFunction;
+import com.eas.script.Scripts;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
@@ -86,6 +88,7 @@ public class ModelCombo extends ModelComponentDecorator<VComboBox<JSObject>, Obj
     @Override
     public JSObject getPublished() {
         if (published == null) {
+            JSObject publisher = Scripts.getSpace().getPublisher(this.getClass().getName());
             if (publisher == null || !publisher.isFunction()) {
                 throw new NoPublisherException();
             }
@@ -94,17 +97,12 @@ public class ModelCombo extends ModelComponentDecorator<VComboBox<JSObject>, Obj
         return published;
     }
 
-    private static JSObject publisher;
-
-    public static void setPublisher(JSObject aPublisher) {
-        publisher = aPublisher;
-    }
-
     protected boolean listChangedEnqueued;
 
     protected void enqueueListChanged() {
         listChangedEnqueued = true;
         EventQueue.invokeLater(() -> {
+            Scripts.setContext(Forms.getContext());
             if (listChangedEnqueued) {
                 listChangedEnqueued = false;
                 refill();
@@ -112,17 +110,16 @@ public class ModelCombo extends ModelComponentDecorator<VComboBox<JSObject>, Obj
         });
     }
 
-    protected void unbindList(){
-        if(boundToList != null){
-            JSObject unlisten = (JSObject) boundToList.getMember("unlisten");
-            unlisten.call(null, new Object[]{});
+    protected void unbindList() {
+        if (boundToList != null) {
+            Scripts.unlisten(boundToList);
             boundToList = null;
         }
     }
-    
-    protected void bindList(){
-        if (displayList != null && com.eas.script.ScriptUtils.isInitialized()) {
-            boundToList = com.eas.script.ScriptUtils.listen(displayList, "length", new AbstractJSObject() {
+
+    protected void bindList() {
+        if (displayList != null && Scripts.isInitialized()) {
+            boundToList = Scripts.getSpace().listen(displayList, "length", new AbstractJSObject() {
 
                 @Override
                 public Object call(Object thiz, Object... args) {
@@ -133,7 +130,7 @@ public class ModelCombo extends ModelComponentDecorator<VComboBox<JSObject>, Obj
             });
         }
     }
-    
+
     private static final String DISPLAY_LIST_JSDOC = ""
             + "/**\n"
             + "* List of displayed options in a dropdown list of the component.\n"

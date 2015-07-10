@@ -9,12 +9,10 @@ import com.eas.client.DatabasesClientWithResource;
 import com.eas.client.model.application.ApplicationDbEntity;
 import com.eas.client.model.application.ApplicationDbModel;
 import com.eas.client.settings.DbConnectionSettings;
-import com.eas.script.ScriptUtils;
+import com.eas.script.Scripts;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
-import java.util.TimeZone;
 import jdk.nashorn.api.scripting.JSObject;
 import net.sf.jxls.transformer.XLSTransformer;
 import org.apache.commons.beanutils.BasicDynaBean;
@@ -57,7 +55,7 @@ public class ExelTemplateTest {
         settings.setUser("eas");
         settings.setPassword("eas");
         settings.setMaxStatements(1);
-        return new DatabasesClientWithResource(settings, null);
+        return new DatabasesClientWithResource(settings);
     }
 
     /**
@@ -68,8 +66,9 @@ public class ExelTemplateTest {
     @Test
     public void testGenerateDataNamedMap() throws Exception {
         System.out.println("GenerateDataNamedMap jsObject");
-        ScriptUtils.init();
-        JSObject data = (JSObject) ScriptUtils.exec("({name : 'test', count : 5, time : new Date(2014, 05, 11, 11, 11, 11, 0), elems : [1, 'Hi', true, {text:'Hello!'}, new Date(2014, 05, 22, 22, 22, 22, 0)]})");
+        //Scripts.init();
+        Scripts.Space space = Scripts.createSpace();
+        JSObject data = (JSObject) space.exec("({name : 'test', count : 5, time : new Date(2014, 05, 11, 11, 11, 11, 0), elems : [1, 'Hi', true, {text:'Hello!'}, new Date(2014, 05, 22, 22, 22, 22, 0)]})");
         ExelTemplate template = new ExelTemplate();
         template.setScriptData(data);
         XLSTransformer transformer = new XLSTransformer();

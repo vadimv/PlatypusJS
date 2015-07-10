@@ -4,7 +4,7 @@
  */
 package com.eas.designer.datamodel.nodes;
 
-import com.bearsoft.rowset.metadata.Field;
+import com.eas.client.metadata.Field;
 import com.eas.client.model.Model;
 import javax.swing.undo.UndoableEdit;
 import org.openide.util.Exceptions;
@@ -39,7 +39,7 @@ public class ModelParameterNode extends FieldNode {
             return !name.isEmpty() 
                     && (model.getParameters().get(name) == null || getName().equalsIgnoreCase(name)) 
                     && model.getEntityByName(name) == null 
-                    && ScriptUtils.isValidJsIdentifier(name);
+                    && Scripts.isValidJsIdentifier(name);
         } catch (Exception ex) {
             ErrorManager.getDefault().notify(ex);
         }

@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("${Type}");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "${Type}";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.${Name}(${NullParams}aDelegate);
     });
     
@@ -12,6 +14,7 @@ ${JsDoc}
             : ${UnwrappedParams};
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return ${Delegate};
             }

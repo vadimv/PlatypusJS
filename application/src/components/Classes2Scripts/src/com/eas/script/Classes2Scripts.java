@@ -20,6 +20,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,6 +35,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import jdk.nashorn.api.scripting.JSObject;
 
 /**
  * The utility application to convert JavaScript API classes with
@@ -50,9 +52,8 @@ public class Classes2Scripts {
 
     private static final String JAVA_CLASS_FILE_EXT = ".class";//NOI18N
     private static final String CONSTRUCTOR_TEMPLATE = getStringResource("constructorTemplate.js");//NOI18N
-    private static final String DEPS_FILE_NAME = "deps.js";//NOI18N
     private static final Set<String> preservedFilesNames = new HashSet<>(Arrays.asList(new String[]{
-        "platypus.js", "internals.js", "http-context.js", "server-deps.js"
+        "platypus.js", "internals.js", "http-context.js", "managed.js", "orderer.js"
     }));
 
     private static final int DEFAULT_IDENTATION_WIDTH = 4;
@@ -207,7 +208,7 @@ public class Classes2Scripts {
                     processJar(classPath);
                 }
             }
-            createDepsFile();
+            //createDepsFile();
         } catch (IOException | ClassNotFoundException ex) {
             Logger.getLogger(Classes2Scripts.class.getName()).log(Level.SEVERE, "Conversion error.", ex);
         }
@@ -228,6 +229,8 @@ public class Classes2Scripts {
             Logger.getLogger(Classes2Scripts.class.getName())
                     .log(Level.FINE, "Processing jar: {0}", new String[]{jarFile.getAbsolutePath()});
             URLClassLoader cl = new URLClassLoader(new URL[]{jarFile.toURI().toURL()}, this.getClass().getClassLoader());
+            Set<File> jarApiFiles = new HashSet<>();
+            File subDir = new File(destDirectory, FileNameSupport.getFileName(FileUtils.removeExtension(jarFile.getName())));
             Enumeration<JarEntry> e = jar.entries();
             while (e.hasMoreElements()) {
                 try {
@@ -239,7 +242,6 @@ public class Classes2Scripts {
                         if (jsConstructor != null) {
                             String js = getClassJs(clazz);
                             if (js != null) {
-                                File subDir = new File(destDirectory, FileNameSupport.getFileName(FileUtils.removeExtension(jarFile.getName())));
                                 if (!subDir.exists()) {
                                     subDir.mkdir();
                                 }
@@ -247,13 +249,35 @@ public class Classes2Scripts {
                                         .log(Level.FINE, "\tClass name: {0}", new String[]{className});
                                 File resultFile = new File(subDir, FileNameSupport.getFileName(jsConstructor.name) + ".js"); //NOI18N
                                 FileUtils.writeString(resultFile, js, SettingsConstants.COMMON_ENCODING);
-                                depsPaths.add(getRelativePath(destDirectory, resultFile));
+                                jarApiFiles.add(resultFile);
                             }
                         }
                     }
                 } catch (NoClassDefFoundError ex) {
                     //NO-OP
                 }
+            }
+            if (!jarApiFiles.isEmpty()) {
+                StringBuilder jarApiDeps = new StringBuilder();
+                jarApiDeps.append("try{\n");
+                jarApiDeps.append(getIndentStr(1)).append("P.require([\n");
+                File[] f = jarApiFiles.toArray(new File[]{});
+                for (int i = 0; i < f.length; i++) {
+                    File jarApiFile = f[i];
+                    if (i == 0) {
+                        jarApiDeps.append(getIndentStr(2)).append("  ");
+                    } else {
+                        jarApiDeps.append(getIndentStr(2)).append(", ");
+                    }
+                    jarApiDeps.append("'./").append(jarApiFile.getName()).append("'\n");
+                }
+                jarApiDeps.append(getIndentStr(1)).append("]);\n");
+                jarApiDeps.append("}catch(e){\n");
+                jarApiDeps.append(getIndentStr(1)).append("print(e);\n");
+                jarApiDeps.append("}\n");
+                File depsFile = Paths.get(subDir.toURI()).resolve("index.js").toFile();
+                FileUtils.writeString(depsFile, jarApiDeps.toString(), SettingsConstants.COMMON_ENCODING);
+                depsPaths.add(getRelativePath(destDirectory, depsFile));
             }
         }
     }
@@ -270,10 +294,6 @@ public class Classes2Scripts {
         }
         if (!checkForHasPublished(clazz)) {
             Logger.getLogger(Classes2Scripts.class.getName()).log(Level.WARNING, "HasPublished iterface is not implemented: {0}", clazz.getName());
-            return null;
-        }
-        if (!checkForSetPublisher(clazz)) {
-            Logger.getLogger(Classes2Scripts.class.getName()).log(Level.WARNING, "setPublisher static method is not implemented: {0}", clazz.getName());
             return null;
         }
         ///
@@ -329,38 +349,34 @@ public class Classes2Scripts {
         return js;
     }
 
-    private void createDepsFile() throws IOException {
-        File deps = new File(destDirectory, DEPS_FILE_NAME);
-        FileUtils.writeString(deps, getDepsJsContent(), SettingsConstants.COMMON_ENCODING);
-    }
-
-    private String getDepsJsContent() {
-        StringBuilder sb = new StringBuilder(DEPS_HEADER);
-        if (!depsPaths.isEmpty()) {
-            String dir = "";
-            String indent = getIndentStr(1);
-            sb.append("try {\n");
-            for (String path : depsPaths) {
-                String pathDir = pathRootDir(path);
-                if (!dir.equals(pathDir) && !dir.isEmpty()) {
-                    sb.append(indent).append("print('").append(dir).append(" API loaded.');\n");
-                    sb.append("} catch (e) {\n");
-                    sb.append(indent).append("print('").append(dir).append(" API skipped.');\n");
-                    sb.append("}\n");
-                    sb.append("\n");
-                    sb.append("try {\n");
-                }
-                dir = pathDir;
-                sb.append(indent).append(String.format("load('classpath:%s');\n", FileNameSupport.getFileName(path)));
-            }
-            sb.append(indent).append("print('").append(dir).append(" API loaded.');\n");
-            sb.append("} catch (e) {\n");
-            sb.append(indent).append("print('").append(dir).append(" API skipped.');\n");
-            sb.append("}\n");
-        }
-        return sb.toString();
-    }
-
+    /*
+     private String getDepsJsContent() {
+     StringBuilder sb = new StringBuilder(DEPS_HEADER);
+     if (!depsPaths.isEmpty()) {
+     String dir = "";
+     String indent = getIndentStr(1);
+     sb.append("try {\n");
+     for (String path : depsPaths) {
+     String pathDir = pathRootDir(path);
+     if (!dir.equals(pathDir) && !dir.isEmpty()) {
+     sb.append(indent).append("print('").append(dir).append(" API loaded.');\n");
+     sb.append("} catch (e) {\n");
+     sb.append(indent).append("print('").append(dir).append(" API skipped.');\n");
+     sb.append("}\n");
+     sb.append("\n");
+     sb.append("try {\n");
+     }
+     dir = pathDir;
+     sb.append(indent).append(String.format("P.require('%s');\n", FileNameSupport.getFileName(path)));
+     }
+     sb.append(indent).append("print('").append(dir).append(" API loaded.');\n");
+     sb.append("} catch (e) {\n");
+     sb.append(indent).append("print('").append(dir).append(" API skipped.');\n");
+     sb.append("}\n");
+     }
+     return sb.toString();
+     }
+     */
     private static String pathRootDir(String path) {
         String[] pathElements = path.split("/");
         if (pathElements.length > 0) {
@@ -378,15 +394,6 @@ public class Classes2Scripts {
 
     private static boolean checkForHasPublished(Class clazz) {
         return HasPublished.class.isAssignableFrom(clazz);
-    }
-
-    private static boolean checkForSetPublisher(Class clazz) {
-        for (Method m : clazz.getDeclaredMethods()) {
-            if (m.getName().equals("setPublisher") && Modifier.isStatic(m.getModifiers())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static String getConstructorJsDoc(FunctionInfo ci) {
@@ -446,14 +453,15 @@ public class Classes2Scripts {
     }
 
     private FunctionInfo getFunctionInfo(String defaultName, Executable ae) {
-        FunctionInfo ci = new FunctionInfo();
+        FunctionInfo fi = new FunctionInfo();
         ScriptFunction sf = (ScriptFunction) ae.getAnnotation(ScriptFunction.class);
-        ci.name = sf.name().isEmpty() ? defaultName : sf.name();
-        ci.jsDoc = formJsDoc(sf.jsDoc());
-        ci.params = new String[sf.params().length];
-        ci.nativeParams = ae.getParameters();
-        System.arraycopy(sf.params(), 0, ci.params, 0, sf.params().length);
-        return ci;
+        fi.name = sf.name().isEmpty() ? defaultName : sf.name();
+        fi.apiName = sf.name();
+        fi.jsDoc = formJsDoc(sf.jsDoc());
+        fi.params = new String[sf.params().length];
+        fi.nativeParams = ae.getParameters();
+        System.arraycopy(sf.params(), 0, fi.params, 0, sf.params().length);
+        return fi;
     }
 
     private String getPropertyPart(String namespace, MethodedPropBox property, int ident) {
@@ -478,7 +486,11 @@ public class Classes2Scripts {
             sb.append(getIndentStr(++i));
             sb.append("var value = ").append(DELEGATE_OBJECT).append(".").append(property.name).append(";\n");
             sb.append(getIndentStr(i));
-            sb.append("return P.boxAsJs(value);\n");
+            if (JSObject.class.isAssignableFrom(property.method.getReturnType())) {
+                sb.append("return value;\n");
+            } else {
+                sb.append("return P.boxAsJs(value);\n");
+            }
         }
         sb.append(getIndentStr(--i));
         sb.append("}");
@@ -487,7 +499,12 @@ public class Classes2Scripts {
             sb.append(getIndentStr(i));
             sb.append("set: function(aValue) {\n");
             sb.append(getIndentStr(++i));
-            sb.append(DELEGATE_OBJECT).append(".").append(property.name).append(" = P.boxAsJava(aValue);\n");
+            sb.append(DELEGATE_OBJECT).append(".").append(property.name);
+            if (JSObject.class.isAssignableFrom(property.method.getReturnType())) {
+                sb.append(" = aValue;\n");
+            } else {
+                sb.append(" = P.boxAsJava(aValue);\n");
+            }
             sb.append(getIndentStr(--i));
             sb.append("}\n");
         } else {
@@ -522,9 +539,13 @@ public class Classes2Scripts {
         FunctionInfo fi = getFunctionInfo(method.getName(), method);
         StringBuilder sb = new StringBuilder();
         int i = ident;
-        sb.append(getMethodJsDoc(namespace, fi.name, fi.jsDoc, ++i)).append("\n");
+        String methodName = fi.name;
+        if (fi.apiName != null && !fi.apiName.isEmpty()) {
+            methodName = fi.apiName;
+        }
+        sb.append(getMethodJsDoc(namespace, methodName, fi.jsDoc, ++i)).append("\n");
         sb.append(getIndentStr(i));
-        sb.append("P.").append(namespace).append(".prototype.").append(method.getName()).append(" = ")
+        sb.append("P.").append(namespace).append(".prototype.").append(methodName).append(" = ")
                 .append("function(");
         StringBuilder paramsInCall = new StringBuilder();
         StringBuilder formalParams = new StringBuilder();
@@ -650,6 +671,7 @@ public class Classes2Scripts {
         }
 
         public String name;
+        public String apiName;
         public String javaClassName;
         public String[] params;
         public Parameter[] nativeParams;

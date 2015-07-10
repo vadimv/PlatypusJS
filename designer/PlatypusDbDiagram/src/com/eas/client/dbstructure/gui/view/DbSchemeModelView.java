@@ -4,11 +4,6 @@
  */
 package com.eas.client.dbstructure.gui.view;
 
-import com.bearsoft.rowset.Rowset;
-import com.bearsoft.rowset.metadata.Field;
-import com.bearsoft.rowset.metadata.Fields;
-import com.bearsoft.rowset.metadata.ForeignKeySpec;
-import com.bearsoft.rowset.metadata.ForeignKeySpec.ForeignKeyRule;
 import com.eas.client.DatabaseMdCache;
 import com.eas.client.SqlCompiledQuery;
 import com.eas.client.dbstructure.DbStructureUtils;
@@ -17,6 +12,10 @@ import com.eas.client.dbstructure.SqlActionsController;
 import com.eas.client.dbstructure.gui.edits.*;
 import com.eas.client.model.gui.SettingsDialog;
 import com.eas.client.metadata.DbTableIndexSpec;
+import com.eas.client.metadata.Field;
+import com.eas.client.metadata.Fields;
+import com.eas.client.metadata.ForeignKeySpec;
+import com.eas.client.metadata.ForeignKeySpec.ForeignKeyRule;
 import com.eas.client.metadata.TableRef;
 import com.eas.client.model.*;
 import com.eas.client.model.dbscheme.DbSchemeModel;
@@ -42,6 +41,7 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
+import java.sql.ResultSet;
 import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
@@ -65,11 +65,6 @@ import org.w3c.dom.Document;
 public class DbSchemeModelView extends ModelView<FieldsEntity, DbSchemeModel> {
 
     protected SqlActionsController sqlController;
-
-    public void resolveRelations() throws Exception {
-        model.clearRelations();
-        addFkRelations(true, null);
-    }
 
     @Override
     public void doAddQuery(String aAppQueryName, int aX, int aY) throws Exception {
@@ -508,17 +503,19 @@ public class DbSchemeModelView extends ModelView<FieldsEntity, DbSchemeModel> {
                         fullTableName = schemaName + "." + fullTableName;
                     }
                     SqlCompiledQuery query = new SqlCompiledQuery(model.getBasesProxy(), tableEntity.getTableDatasourceName(), "select count(*) cnt from " + fullTableName);
-                    Rowset rs = query.executeQuery(null, null);
-                    if (rs != null) {
-                        if (!rs.isEmpty()) {
-                            Object cnt = rs.getRow(1).getColumnObject(1);
+                    Integer count = query.executeQuery((ResultSet r) -> {
+                        if (r.next()) {
+                            Object cnt = r.getObject(1);
                             if (cnt instanceof Number) {
                                 return ((Number) cnt).intValue();
                             } else {
                                 return 0;
                             }
+                        } else {
+                            return 0;
                         }
-                    }
+                    }, null, null, null);
+                    return count != null ? count : 0;
                 } catch (Exception ex) {
                     Logger.getLogger(DbSchemeModelView.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -810,17 +807,19 @@ public class DbSchemeModelView extends ModelView<FieldsEntity, DbSchemeModel> {
                         fullTableName = schemaName + "." + fullTableName;
                     }
                     SqlCompiledQuery query = new SqlCompiledQuery(model.getBasesProxy(), tableEntity.getTableDatasourceName(), "select count(*) cnt from " + fullTableName);
-                    Rowset rs = query.executeQuery(null, null);
-                    if (rs != null) {
-                        if (!rs.isEmpty()) {
-                            Object cnt = rs.getRow(1).getColumnObject(1);
+                    Integer count = query.executeQuery((ResultSet r) -> {
+                        if (r.next()) {
+                            Object cnt = r.getObject(1);
                             if (cnt instanceof Number) {
                                 return ((Number) cnt).intValue();
                             } else {
                                 return 0;
                             }
+                        } else {
+                            return 0;
                         }
-                    }
+                    }, null, null, null);
+                    return count != null ? count : 0;
                 } catch (Exception ex) {
                     Logger.getLogger(DbSchemeModelView.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -1089,7 +1088,7 @@ public class DbSchemeModelView extends ModelView<FieldsEntity, DbSchemeModel> {
         String content = XmlDom2String.transform(doc);
         string2SystemClipboard(content);
     }
-
+    
     public void resolveTables() throws Exception {
         Map<Long, FieldsEntity> entities = model.getEntities();
         if (entities != null && !entities.isEmpty()) {
@@ -1111,35 +1110,9 @@ public class DbSchemeModelView extends ModelView<FieldsEntity, DbSchemeModel> {
         }
     }
 
-    private void resolveFields() throws Exception {
-        Map<Long, FieldsEntity> entities = model.getEntities();
-        if (entities != null) {
-            for (FieldsEntity entity : entities.values()) {
-                model.getBasesProxy().dbTableChanged(entity.getTableDatasourceName(), entity.getTableSchemaName(), entity.getTableName());
-            }
-        }
-    }
-
-    private void resolveIndexes() {
-        Map<Long, FieldsEntity> entities = model.getEntities();
-        if (entities != null) {
-            for (FieldsEntity entity : entities.values()) {
-                entity.achiveIndexes();
-            }
-        }
-    }
-
-    public void entireSynchronizeWithDb() throws Exception {
-        model.removeEditingListener(modelListener);
-        try {
-            resolveTables();
-            resolveFields();
-            resolveIndexes();
-            resolveRelations();
-        } finally {
-            model.addEditingListener(modelListener);
-        }
-        refreshView();
+    public void resolveRelations() throws Exception {
+        model.clearRelations();
+        addFkRelations(true, null);
     }
 
     private boolean isEntityTableExists(FieldsEntity fEntity) throws Exception {
@@ -1161,4 +1134,36 @@ public class DbSchemeModelView extends ModelView<FieldsEntity, DbSchemeModel> {
          }
          */
     }
+/*
+    private void resolveFields() throws Exception {
+        Map<Long, FieldsEntity> entities = model.getEntities();
+        if (entities != null) {
+            for (FieldsEntity entity : entities.values()) {
+                model.getBasesProxy().dbTableChanged(entity.getTableDatasourceName(), entity.getTableSchemaName(), entity.getTableName());
+            }
+        }
+    }
+
+    private void resolveIndexes() {
+        Map<Long, FieldsEntity> entities = model.getEntities();
+        if (entities != null) {
+            entities.values().stream().forEach((entity) -> {
+                entity.achiveIndexes();
+            });
+        }
+    }
+
+    public void entireSynchronizeWithDb() throws Exception {
+        model.removeEditingListener(modelListener);
+        try {
+            resolveTables();
+            resolveFields();
+            resolveIndexes();
+            resolveRelations();
+        } finally {
+            model.addEditingListener(modelListener);
+        }
+        refreshView();
+    }
+*/
 }

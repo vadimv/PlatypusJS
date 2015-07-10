@@ -4,17 +4,16 @@
  */
 package com.eas.server.httpservlet;
 
-import com.bearsoft.rowset.changes.Change;
-import com.bearsoft.rowset.changes.ChangeValue;
-import com.bearsoft.rowset.changes.Command;
-import com.bearsoft.rowset.changes.Delete;
-import com.bearsoft.rowset.changes.Insert;
-import com.bearsoft.rowset.changes.Update;
-import com.bearsoft.rowset.metadata.DataTypeInfo;
-import com.bearsoft.rowset.metadata.Field;
-import com.eas.client.threetier.RowsetJsonConstants;
-import com.eas.script.ScriptUtils;
-import com.eas.server.httpservlet.serial.ChangeJsonReader;
+import com.eas.client.changes.Change;
+import com.eas.client.changes.ChangeValue;
+import com.eas.client.changes.Command;
+import com.eas.client.changes.Delete;
+import com.eas.client.changes.Insert;
+import com.eas.client.changes.Update;
+import com.eas.client.metadata.DataTypeInfo;
+import com.eas.client.threetier.json.ChangesJSONReader;
+import com.eas.script.Scripts;
+import com.eas.util.RowsetJsonConstants;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -43,44 +42,8 @@ public class PlatypusRequestHttpReaderTest {
     @Test
     public void changesJsonReadTest() throws Exception {
         System.out.println("changesJsonReadTest");
-        ScriptUtils.init();
-        List<Change> changes = ChangeJsonReader.parse(WRITTEN_CHANGES, (String aEntityId, String aFieldName) -> {
-            assertEquals("testEntity", aEntityId);
-            switch (aFieldName) {
-                case "key1": {
-                    Field field = new Field(aFieldName, "", DataTypeInfo.FLOAT);
-                    return field;
-                }
-                case "key2": {
-                    Field field = new Field(aFieldName, "", DataTypeInfo.CHAR);
-                    return field;
-                }
-                case "data\"\"1": {
-                    Field field = new Field(aFieldName, "", DataTypeInfo.INTEGER);
-                    return field;
-                }
-                case "data2": {
-                    Field field = new Field(aFieldName, "", DataTypeInfo.VARCHAR);
-                    return field;
-                }
-                case "da\"ta3": {
-                    Field field = new Field(aFieldName, "", DataTypeInfo.BOOLEAN);
-                    return field;
-                }
-                case "data4": {
-                    Field field = new Field(aFieldName, "", DataTypeInfo.BIT);
-                    return field;
-                }
-                case "data5": {
-                    Field field = new Field(aFieldName, "", DataTypeInfo.TIMESTAMP);
-                    return field;
-                }
-                default: {
-                    fail("Unknown field name ocured while testing");
-                    return null;
-                }
-            }
-        });
+        Scripts.Space space = Scripts.createSpace();
+        List<Change> changes = ChangesJSONReader.read(WRITTEN_CHANGES, space);
 
         ChangeValue key1 = new ChangeValue("key1", 78.9f, DataTypeInfo.FLOAT);
         ChangeValue key2 = new ChangeValue("key2", "key2Value", DataTypeInfo.CHAR);
@@ -109,27 +72,27 @@ public class PlatypusRequestHttpReaderTest {
         assertEquals("testEntity", d.entityName);
         assertEquals("testEntity", c.entityName);
         assertNull(c.command);
-        assertNotNull(i.data);
-        assertEquals(5, i.data.length);
-        assertNotNull(u.data);
-        assertEquals(5, u.data.length);
-        for (int j = 0; j < i.data.length; j++) {
-            assertNotSame(i.data[j], u.data[j]);
-            compareValues(i.data[j], u.data[j]);
-            compareValues(i.data[j], data[j]);
+        assertNotNull(i.getData());
+        assertEquals(5, i.getData().size());
+        assertNotNull(u.getData());
+        assertEquals(5, u.getData().size());
+        for (int j = 0; j < i.getData().size(); j++) {
+            assertNotSame(i.getData().get(j), u.getData().get(j));
+            compareValues(i.getData().get(j), u.getData().get(j));
+            compareValues(i.getData().get(j), data[j]);
         }
-        assertNotNull(u.keys);
-        assertEquals(2, u.keys.length);
-        assertNotNull(d.keys);
-        assertEquals(2, d.keys.length);
-        assertNotNull(c.parameters);
-        assertEquals(2, c.parameters.length);
-        for (int j = 0; j < u.keys.length; j++) {
-            assertNotSame(u.keys[j], d.keys[j]);
-            compareValues(u.keys[j], d.keys[j]);
-            assertNotSame(u.keys[j], c.parameters[j]);
-            compareValues(u.keys[j], c.parameters[j]);
-            compareValues(u.keys[j], keys[j]);
+        assertNotNull(u.getKeys());
+        assertEquals(2, u.getKeys().size());
+        assertNotNull(d.getKeys());
+        assertEquals(2, d.getKeys().size());
+        assertNotNull(c.getParameters());
+        assertEquals(2, c.getParameters().size());
+        for (int j = 0; j < u.getKeys().size(); j++) {
+            assertNotSame(u.getKeys().get(j), d.getKeys().get(j));
+            compareValues(u.getKeys().get(j), d.getKeys().get(j));
+            assertNotSame(u.getKeys().get(j), c.getParameters().get(j));
+            compareValues(u.getKeys().get(j), c.getParameters().get(j));
+            compareValues(u.getKeys().get(j), keys[j]);
         }
     }
 

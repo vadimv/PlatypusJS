@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.forms.components.model.ModelFormattedField");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.forms.components.model.ModelFormattedField";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.ModelFormattedField(aDelegate);
     });
     
@@ -15,6 +17,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -42,10 +45,10 @@
         Object.defineProperty(this, "onMouseReleased", {
             get: function() {
                 var value = delegate.onMouseReleased;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseReleased = P.boxAsJava(aValue);
+                delegate.onMouseReleased = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -59,10 +62,10 @@
         Object.defineProperty(this, "data", {
             get: function() {
                 var value = delegate.data;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.data = P.boxAsJava(aValue);
+                delegate.data = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -93,10 +96,10 @@
         Object.defineProperty(this, "onValueChange", {
             get: function() {
                 var value = delegate.onValueChange;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onValueChange = P.boxAsJava(aValue);
+                delegate.onValueChange = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -110,10 +113,10 @@
         Object.defineProperty(this, "onParse", {
             get: function() {
                 var value = delegate.onParse;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onParse = P.boxAsJava(aValue);
+                delegate.onParse = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -144,10 +147,10 @@
         Object.defineProperty(this, "onComponentMoved", {
             get: function() {
                 var value = delegate.onComponentMoved;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentMoved = P.boxAsJava(aValue);
+                delegate.onComponentMoved = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -161,10 +164,10 @@
         Object.defineProperty(this, "onRender", {
             get: function() {
                 var value = delegate.onRender;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onRender = P.boxAsJava(aValue);
+                delegate.onRender = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -226,10 +229,10 @@
         Object.defineProperty(this, "onMouseEntered", {
             get: function() {
                 var value = delegate.onMouseEntered;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseEntered = P.boxAsJava(aValue);
+                delegate.onMouseEntered = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -291,10 +294,10 @@
         Object.defineProperty(this, "onComponentShown", {
             get: function() {
                 var value = delegate.onComponentShown;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentShown = P.boxAsJava(aValue);
+                delegate.onComponentShown = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -325,10 +328,10 @@
         Object.defineProperty(this, "onComponentHidden", {
             get: function() {
                 var value = delegate.onComponentHidden;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentHidden = P.boxAsJava(aValue);
+                delegate.onComponentHidden = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -359,10 +362,10 @@
         Object.defineProperty(this, "onKeyReleased", {
             get: function() {
                 var value = delegate.onKeyReleased;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onKeyReleased = P.boxAsJava(aValue);
+                delegate.onKeyReleased = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -376,10 +379,10 @@
         Object.defineProperty(this, "onActionPerformed", {
             get: function() {
                 var value = delegate.onActionPerformed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onActionPerformed = P.boxAsJava(aValue);
+                delegate.onActionPerformed = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -410,10 +413,10 @@
         Object.defineProperty(this, "onKeyTyped", {
             get: function() {
                 var value = delegate.onKeyTyped;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onKeyTyped = P.boxAsJava(aValue);
+                delegate.onKeyTyped = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -427,10 +430,10 @@
         Object.defineProperty(this, "onMouseWheelMoved", {
             get: function() {
                 var value = delegate.onMouseWheelMoved;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseWheelMoved = P.boxAsJava(aValue);
+                delegate.onMouseWheelMoved = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -526,10 +529,10 @@
         Object.defineProperty(this, "onMouseDragged", {
             get: function() {
                 var value = delegate.onMouseDragged;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseDragged = P.boxAsJava(aValue);
+                delegate.onMouseDragged = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -543,10 +546,10 @@
         Object.defineProperty(this, "onFocusLost", {
             get: function() {
                 var value = delegate.onFocusLost;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onFocusLost = P.boxAsJava(aValue);
+                delegate.onFocusLost = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -594,10 +597,10 @@
         Object.defineProperty(this, "onMousePressed", {
             get: function() {
                 var value = delegate.onMousePressed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMousePressed = P.boxAsJava(aValue);
+                delegate.onMousePressed = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -646,10 +649,10 @@
         Object.defineProperty(this, "onSelect", {
             get: function() {
                 var value = delegate.onSelect;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onSelect = P.boxAsJava(aValue);
+                delegate.onSelect = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -714,10 +717,10 @@
         Object.defineProperty(this, "onComponentResized", {
             get: function() {
                 var value = delegate.onComponentResized;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onComponentResized = P.boxAsJava(aValue);
+                delegate.onComponentResized = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -731,10 +734,10 @@
         Object.defineProperty(this, "onFormat", {
             get: function() {
                 var value = delegate.onFormat;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onFormat = P.boxAsJava(aValue);
+                delegate.onFormat = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -748,10 +751,10 @@
         Object.defineProperty(this, "onMouseMoved", {
             get: function() {
                 var value = delegate.onMouseMoved;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseMoved = P.boxAsJava(aValue);
+                delegate.onMouseMoved = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -830,10 +833,10 @@
         Object.defineProperty(this, "onFocusGained", {
             get: function() {
                 var value = delegate.onFocusGained;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onFocusGained = P.boxAsJava(aValue);
+                delegate.onFocusGained = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -847,10 +850,10 @@
         Object.defineProperty(this, "onMouseClicked", {
             get: function() {
                 var value = delegate.onMouseClicked;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseClicked = P.boxAsJava(aValue);
+                delegate.onMouseClicked = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -864,10 +867,10 @@
         Object.defineProperty(this, "onMouseExited", {
             get: function() {
                 var value = delegate.onMouseExited;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onMouseExited = P.boxAsJava(aValue);
+                delegate.onMouseExited = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -915,10 +918,10 @@
         Object.defineProperty(this, "onKeyPressed", {
             get: function() {
                 var value = delegate.onKeyPressed;
-                return P.boxAsJs(value);
+                return value;
             },
             set: function(aValue) {
-                delegate.onKeyPressed = P.boxAsJava(aValue);
+                delegate.onKeyPressed = aValue;
             }
         });
         if(!P.ModelFormattedField){
@@ -931,17 +934,6 @@
         }
     };
         /**
-         * Redraw the component.
-         * @method redraw
-         * @memberOf ModelFormattedField
-         */
-        P.ModelFormattedField.prototype.redraw = function() {
-            var delegate = this.unwrap();
-            var value = delegate.redraw();
-            return P.boxAsJs(value);
-        };
-
-        /**
          * Tries to acquire focus for this component.
          * @method focus
          * @memberOf ModelFormattedField
@@ -949,6 +941,17 @@
         P.ModelFormattedField.prototype.focus = function() {
             var delegate = this.unwrap();
             var value = delegate.focus();
+            return P.boxAsJs(value);
+        };
+
+        /**
+         * Redraw the component.
+         * @method redraw
+         * @memberOf ModelFormattedField
+         */
+        P.ModelFormattedField.prototype.redraw = function() {
+            var delegate = this.unwrap();
+            var value = delegate.redraw();
             return P.boxAsJs(value);
         };
 

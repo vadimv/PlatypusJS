@@ -18,10 +18,8 @@ import com.bearsoft.gwt.ui.widgets.grid.processing.IndexOfProvider;
 import com.bearsoft.gwt.ui.widgets.grid.processing.ListMultiSortHandler;
 import com.bearsoft.gwt.ui.widgets.grid.processing.TreeDataProvider;
 import com.bearsoft.gwt.ui.widgets.grid.processing.TreeMultiSortHandler;
-import com.bearsoft.rowset.Utils;
-import com.bearsoft.rowset.Utils.JsObject;
-import com.bearsoft.rowset.beans.PropertyChangeEvent;
-import com.bearsoft.rowset.beans.PropertyChangeListener;
+import com.eas.client.Utils;
+import com.eas.client.Utils.JsObject;
 import com.eas.client.form.ControlsUtils;
 import com.eas.client.form.EventsExecutor;
 import com.eas.client.form.JavaScriptObjectKeyProvider;
@@ -83,6 +81,7 @@ import com.google.gwt.user.cellview.client.ColumnSortEvent;
 import com.google.gwt.user.cellview.client.ColumnSortEvent.ListHandler;
 import com.google.gwt.user.cellview.client.Header;
 import com.google.gwt.user.client.ui.HasEnabled;
+import com.google.gwt.user.client.ui.Widget;
 import com.google.gwt.view.client.CellPreviewEvent;
 import com.google.gwt.view.client.ListDataProvider;
 import com.google.gwt.view.client.SelectionChangeEvent;
@@ -119,6 +118,7 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 	protected String groupName = "group-name-" + Document.get().createUniqueId();
 	protected List<HeaderNode<JavaScriptObject>> header = new ArrayList<>();
 	// runtime
+	protected Widget activeEditor;
 	protected ListHandler<JavaScriptObject> sortHandler;
 	protected HandlerRegistration sortHandlerReg;
 	protected HandlerRegistration positionSelectionHandler;
@@ -136,7 +136,7 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 				Object oData = data != null && field != null && !field.isEmpty() ? Utils.getPathData(data, field) : data;
 				JsObject jsData = oData instanceof JavaScriptObject ? ((JavaScriptObject) oData).<JsObject> cast() : null;
 				if (jsData != null) {
-					if (getSelectionModel() instanceof SetSelectionModel<?>) {
+					if (activeEditor == null && getSelectionModel() instanceof SetSelectionModel<?>) {
 						final SetSelectionModel<JavaScriptObject> rowsSelection = (SetSelectionModel<JavaScriptObject>) getSelectionModel();
 						if (event.getNativeKeyCode() == KeyCodes.KEY_DELETE && deletable) {
 							final List<JavaScriptObject> viewElements = dataProvider.getList();
@@ -231,7 +231,15 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 		}, KeyDownEvent.getType());
 		applyRows();
 	}
-
+	
+	public Widget getActiveEditor(){
+		return activeEditor;
+	}
+	
+	public void setActiveEditor(Widget aWidget) {
+	    activeEditor = aWidget;
+    }
+	
 	public String getGroupName() {
 		return groupName;
 	}
@@ -253,15 +261,17 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 			public void execute() {
 				if (serviceColumnsRedrawQueued) {
 					serviceColumnsRedrawQueued = false;
-					for (int i = 0; i < getDataColumnCount(); i++) {
-						ModelColumn col = (ModelColumn) getDataColumn(i);
-						if (col instanceof UsualServiceColumn) {
-							if (i < frozenColumns) {
-								frozenLeft.redrawAllRowsInColumn(i, dataProvider);
-								scrollableLeft.redrawAllRowsInColumn(i, dataProvider);
-							} else {
-								frozenRight.redrawAllRowsInColumn(i - frozenColumns, dataProvider);
-								scrollableRight.redrawAllRowsInColumn(i - frozenColumns, dataProvider);
+					if(getDataColumnCount() > 0){
+						for (int i = 0; i < getDataColumnCount(); i++) {
+							ModelColumn col = (ModelColumn) getDataColumn(i);
+							if (col instanceof UsualServiceColumn) {
+								if (i < frozenColumns) {
+									frozenLeft.redrawAllRowsInColumn(i, dataProvider);
+									scrollableLeft.redrawAllRowsInColumn(i, dataProvider);
+								} else {
+									frozenRight.redrawAllRowsInColumn(i - frozenColumns, dataProvider);
+									scrollableRight.redrawAllRowsInColumn(i - frozenColumns, dataProvider);
+								}
 							}
 						}
 					}
@@ -296,7 +306,7 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 				setupVisibleRanges();
 				if (dataProvider instanceof IndexOfProvider<?>)
 					((IndexOfProvider<?>) dataProvider).rescan();
-				sortHandler.setList(dataProvider.getList());
+				sortHandler.setList(dataProvider != null ? dataProvider.getList() : new ArrayList<JavaScriptObject>());
 				if (sortList.size() > 0) {
 					sortList.clear();
 					redrawHeaders();
@@ -366,10 +376,10 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 			}
 			sortHandlerReg = addColumnSortHandler(sortHandler);
 			((JsDataContainer) getDataProvider()).setData(jsData);
-			boundToCursor = Utils.listen(jsData, cursorProperty, new PropertyChangeListener() {
+			boundToCursor = Utils.listenPath(jsData, cursorProperty, new Utils.OnChangeHandler() {
 
 				@Override
-				public void propertyChange(PropertyChangeEvent evt) {
+				public void onChange(JavaScriptObject anEvent) {
 					enqueueServiceColumnsRedraw();
 				}
 
@@ -394,20 +404,33 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 		frozenRight.redraw();
 		scrollableLeft.redraw();
 		scrollableRight.redraw();
+		pingGWTFinallyCommands();
 	}
 
+	private void pingGWTFinallyCommands(){
+		// Dirty hack of GWT Scgeduler.get().scheduleFinally();
+		// Finally commands ocasionally not been executed without user interaction for while.
+		Scheduler.get().scheduleDeferred(new ScheduledCommand() {
+			
+			@Override
+			public void execute() {
+				Logger.getLogger(ModelGrid.class.getName()).log(Level.FINE, "ping GWT Finally commands");
+			}
+		});
+	}
+	
 	protected void bind() {
 		if (data != null) {
 			applyRows();
 			setSelectionModel(new MultiJavaScriptObjectSelectionModel(this));
 			if (field != null && !field.isEmpty()) {
-				boundToData = Utils.listen(data, field, new PropertyChangeListener() {
+				boundToData = Utils.listenPath(data, field, new Utils.OnChangeHandler() {
+					
 					@Override
-					public void propertyChange(PropertyChangeEvent evt) {
+					public void onChange(JavaScriptObject anEvent) {
 						applyRows();
 						setSelectionModel(new MultiJavaScriptObjectSelectionModel(ModelGrid.this));
 					}
-
 				});
 			}
 		} else {
@@ -1035,11 +1058,11 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 				aWidget.@com.eas.client.form.published.widgets.model.ModelGrid::setChildrenField(Ljava/lang/String;)(aValue != null ? '' + aValue : null);
 			}
 		});
-		
+
 		aPublished.unsort = function() {
 			aWidget.@com.eas.client.form.published.widgets.model.ModelGrid::unsort()();
 		};
-		
+
 	}-*/;
 
 	public JavaScriptObject getOnRender() {
@@ -1080,10 +1103,12 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 
 	public void selectElement(JavaScriptObject aElement) {
 		getSelectionModel().setSelected(aElement, true);
+		pingGWTFinallyCommands();
 	}
 
 	public void unselectElement(JavaScriptObject anElement) {
 		getSelectionModel().setSelected(anElement, false);
+		pingGWTFinallyCommands();
 	}
 
 	public List<JavaScriptObject> getJsSelected() throws Exception {
@@ -1102,6 +1127,7 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 				sm.setSelected(row, false);
 			}
 		}
+		pingGWTFinallyCommands();
 	}
 
 	public boolean isEditable() {
@@ -1162,6 +1188,7 @@ public class ModelGrid extends Grid<JavaScriptObject> implements HasJsFacade, Ha
 					scrollableRight.setKeyboardSelectedRow(index - frozenRows, true);
 				}
 			}
+			pingGWTFinallyCommands();
 			return true;
 		} else
 			return false;

@@ -2,63 +2,39 @@
  * Platypus.js internals initialization.
  * Don't edit unless you are a Platypus.js contributor.
  */
-(function () {
-    var ScriptUtils = Java.type('com.eas.script.ScriptUtils');
-    ScriptUtils.setToPrimitiveFunc(function (aValue) {
-        if (aValue && aValue.constructor) {
-            var cName = aValue.constructor.name;
-            if (cName === 'Date') {
-                var dateClass = Java.type('java.util.Date');
-                var converted = new dateClass(aValue.getTime());
-                return converted;
-            } else if (cName === 'String') {
-                return aValue + '';
-            } else if (cName === 'Number') {
-                return aValue * 1;
-            } else if (cName === 'Boolean') {
-                return !!aValue;
-            }
-        }
-        return aValue;
-    });
-    ScriptUtils.setLookupInGlobalFunc(
+(function (aSpace) {
+    aSpace.setLookupInGlobalFunc(
             function (aPropertyName) {
                 return this[aPropertyName];
             });
-    ScriptUtils.setPutInGlobalFunc(
+    aSpace.setPutInGlobalFunc(
             function (aPropertyName, aValue) {
                 this[aPropertyName] = aValue;
             });
-    ScriptUtils.setToDateFunc(
+    aSpace.setToDateFunc(
             function (aJavaDate) {
                 return aJavaDate !== null ? new Date(aJavaDate.time) : null;
             });
-    ScriptUtils.setParseJsonFunc(
+    aSpace.setParseJsonFunc(
             function (str) {
                 return JSON.parse(str);
             });
+    aSpace.setParseJsonWithDatesFunc(
+            function (str) {
+                return JSON.parse(str, function (k, v) {
+                    if (typeof v === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/.test(v)) {
+                        return new Date(v);
+                    } else {
+                        return v;
+                    }
+                });
+            });
 
-    var parseDates = function (aObject) {
-        if (typeof aObject === 'string' || aObject && aObject.constructor && aObject.constructor.name === 'String') {
-            var strValue = '' + aObject;
-            if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/.test(strValue)) {
-                return new Date(strValue);
-            }
-        } else if (typeof aObject === 'object') {
-            for (var prop in aObject) {
-                aObject[prop] = parseDates(aObject[prop]);
-            }
-        }
-        return aObject;
-    };
-
-    ScriptUtils.setParseDatesFunc(parseDates);
-
-    ScriptUtils.setWriteJsonFunc(
+    aSpace.setWriteJsonFunc(
             function (aObj) {
                 return JSON.stringify(aObj);
             });
-    ScriptUtils.setExtendFunc(
+    aSpace.setExtendFunc(
             function (Child, Parent) {
                 var prevChildProto = {};
                 for (var m in Child.prototype) {
@@ -76,11 +52,11 @@
                 Child.prototype.constructor = Child;
                 Child.superclass = Parent.prototype;
             });
-    ScriptUtils.setScalarDefFunc(
+    aSpace.setScalarDefFunc(
             function (targetPublishedEntity, targetFieldName, sourceFieldName) {
                 var _self = this;
-                _self.enumerable = true;
-                _self.configurable = false;
+                _self.enumerable = false;
+                _self.configurable = true;
                 _self.get = function () {
                     var criterion = {};
                     criterion[targetFieldName] = this[sourceFieldName];
@@ -91,149 +67,70 @@
                     this[sourceFieldName] = aValue ? aValue[targetFieldName] : null;
                 };
             });
-    ScriptUtils.setCollectionDefFunc(
-            function (sourcePublishedEntity, targetFieldName, sourceFieldName) {
-                var _self = this;
-                _self.enumerable = true;
-                _self.configurable = true;
-                _self.get = function () {
-                    var criterion = {};
-                    var targetKey = this[targetFieldName];
-                    criterion[sourceFieldName] = targetKey;
-                    var res = sourcePublishedEntity.find(criterion);
-                    res.push = function () {
-                        for (var a = 0; a < arguments.length; a++) {
-                            var instance = arguments[a];
-                            instance[sourceFieldName] = targetKey;
-                        }
-                        return Array.prototype.push.apply(res, arguments);
-                    };
-                    res.unshift = function () {
-                        for (var a = 0; a < arguments.length; a++) {
-                            var instance = arguments[a];
-                            instance[sourceFieldName] = targetKey;
-                        }
-                        return Array.prototype.unshift.apply(res, arguments);
-                    };
-                    res.splice = function () {
-                        for (var a = 2; a < arguments.length; a++) {
-                            var _instance = arguments[a];
-                            _instance[sourceFieldName] = targetKey;
-                        }
-                        var deleted = Array.prototype.splice.apply(res, arguments);
-                        for (var d = 0; d < deleted.length; d++) {
-                            var instance = deleted[d];
-                            instance[sourceFieldName] = null;
-                        }
-                        return deleted;
-                    };
-                    res.pop = function () {
-                        var deleted = Array.prototype.pop.apply(res, arguments);
-                        deleted[sourceFieldName] = null;
-                        return deleted;
-                    };
-                    res.shift = function () {
-                        var deleted = Array.prototype.shift.apply(res, arguments);
-                        deleted[sourceFieldName] = null;
-                        return deleted;
-                    };
-                    return res;
-                };
-            });
-    ScriptUtils.setIsArrayFunc(function (aInstance) {
+    aSpace.setIsArrayFunc(function (aInstance) {
         return aInstance instanceof Array;
     });
-    ScriptUtils.setMakeObjFunc(function () {
+    aSpace.setMakeObjFunc(function () {
         return {};
     });
-    ScriptUtils.setMakeArrayFunc(function () {
+    aSpace.setMakeArrayFunc(function () {
         return [];
     });
-
-    function listenElements(aData, aPropListener){
-        function subscribe(aData, aListener) {
-            if (aData.unwrap) {
-                var target = aData.unwrap();
-                if (target.addPropertyChangeListener) {
-                    var adapter = new PAdapterClass(aListener);
-                    target.addPropertyChangeListener(adapter);
-                    return function () {
-                        target.removePropertyChangeListener(adapter);
-                    };
-                }
-            }
+    aSpace.setLoadFunc(function (aSourceLocation) {
+        return load(aSourceLocation);
+    });
+    var EngineUtilsClass = Java.type("jdk.nashorn.api.scripting.ScriptUtils");
+    var HashMapClass = Java.type('java.util.HashMap');
+    function copy(aValue, aMapping) {
+        aValue = EngineUtilsClass.unwrap(aValue);
+        if (!aMapping)
+            aMapping = new HashMapClass();
+        if (aValue === null || aValue === undefined)
             return null;
-        }
-        var subscribed = [];
-        for(var i = 0; i < aData.length; i++){
-            var remover = subscribe(aData[i], aPropListener);
-            if(remover){
-                subscribed.push(remover);
-            }
-        }
-        return {
-            unlisten: function () {
-                subscribed.forEach(function (aEntry) {
-                    aEntry();
-                });
-            }
-        };
-    }
-    ScriptUtils.setListenElementsFunc(listenElements);
-
-    var PAdapterClass = Java.type("com.eas.client.scripts.PropertyChangeListenerJSAdapter");
-    function listen(aTarget, aPath, aPropListener) {
-        function subscribe(aData, aListener, aPropName) {
-            if (aData.unwrap) {
-                var target = aData.unwrap();
-                if (target.getRowset)
-                    target = target.getRowset();
-                if (target.addPropertyChangeListener) {
-                    var adapter = new PAdapterClass(aListener);
-                    target.addPropertyChangeListener(aPropName, adapter);
-                    return function () {
-                        target.removePropertyChangeListener(aPropName, adapter);
-                    };
-                }
-            }
-            return null;
-        }
-        var subscribed = [];
-        function listenPath() {
-            subscribed = [];
-            var data = aTarget;
-            var path = aPath.split(".");
-            for (var i = 0; i < path.length; i++) {
-                var propName = path[i];
-                var listener = i === path.length - 1 ? aPropListener : function (evt) {
-                    subscribed.forEach(function (aEntry) {
-                        aEntry();
-                    });
-                    listenPath();
-                    aPropListener(evt);
-                };
-                var cookie = subscribe(data, listener, propName);
-                if (cookie) {
-                    subscribed.push(cookie);
-                    if (data[propName])
-                        data = data[propName];
-                    else
-                        break;
+        else {
+            var type = typeof aValue;
+            if (type === 'number')
+                return +aValue;
+            else if (type === 'string')
+                return aValue + '';
+            else if (type === 'boolean')
+                return !!aValue;
+            else if (type === 'object') {
+                if (aValue instanceof Date) {
+                    return new Date(aValue.getTime());
+                } else if (aValue instanceof RegExp) {
+                    var flags = '';
+                    if (aValue.global)
+                        flags += 'g';
+                    if (aValue.ignoreCase)
+                        flags += 'i';
+                    if (aValue.multiline)
+                        flags += 'm';
+                    return new RegExp(aValue.source, flags);
+                } else if (aValue instanceof Number) {
+                    return +aValue;
+                } else if (aValue instanceof String) {
+                    return aValue + '';
+                } else if (aValue instanceof Boolean) {
+                    return !!aValue;
                 } else {
-                    break;
+                    var copied = aValue instanceof Array ? [] : {};
+                    aMapping.put(aValue, copied);
+                    for (var p in aValue) {
+                        var pValue = aValue[p];
+                        if (typeof pValue !== 'function') {
+                            if (aMapping.containsKey(pValue))
+                                copied[p] = aMapping.get(pValue);
+                            else
+                                copied[p] = copy(pValue, aMapping);
+                        }
+                    }
+                    return copied;
                 }
             }
         }
-        if (aTarget) {
-            listenPath();
-        }
-        return {
-            unlisten: function () {
-                subscribed.forEach(function (aEntry) {
-                    aEntry();
-                });
-            }
-        };
     }
-    ScriptUtils.setListenFunc(listen);
-})();
+    aSpace.setCopyObjectFunc(function (aValue, aConsumer) {
+        aConsumer(copy(aValue));
+    });
+});

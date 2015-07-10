@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.forms.events.MouseEvent");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.forms.events.MouseEvent";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.MouseEvent(aDelegate);
     });
     
@@ -15,6 +17,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -93,20 +96,6 @@
              */
             P.MouseEvent.prototype.clickCount = 0;
         }
-        Object.defineProperty(this, "metaDown", {
-            get: function() {
-                var value = delegate.metaDown;
-                return P.boxAsJs(value);
-            }
-        });
-        if(!P.MouseEvent){
-            /**
-             * Meta key is down on this event.
-             * @property metaDown
-             * @memberOf MouseEvent
-             */
-            P.MouseEvent.prototype.metaDown = true;
-        }
         Object.defineProperty(this, "x", {
             get: function() {
                 var value = delegate.x;
@@ -120,6 +109,20 @@
              * @memberOf MouseEvent
              */
             P.MouseEvent.prototype.x = 0;
+        }
+        Object.defineProperty(this, "metaDown", {
+            get: function() {
+                var value = delegate.metaDown;
+                return P.boxAsJs(value);
+            }
+        });
+        if(!P.MouseEvent){
+            /**
+             * Meta key is down on this event.
+             * @property metaDown
+             * @memberOf MouseEvent
+             */
+            P.MouseEvent.prototype.metaDown = true;
         }
         Object.defineProperty(this, "y", {
             get: function() {

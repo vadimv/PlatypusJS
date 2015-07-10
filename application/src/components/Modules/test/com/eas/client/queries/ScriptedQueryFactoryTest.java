@@ -4,11 +4,12 @@
  */
 package com.eas.client.queries;
 
-import com.bearsoft.rowset.metadata.Field;
-import com.bearsoft.rowset.metadata.Fields;
 import com.eas.client.DatabasesClientWithResource;
 import com.eas.client.SqlQuery;
 import com.eas.client.cache.ApplicationSourceIndexer;
+import com.eas.client.metadata.Field;
+import com.eas.client.metadata.Fields;
+import com.eas.client.settings.DbConnectionSettings;
 import com.eas.script.JsDoc;
 import org.junit.*;
 import static org.junit.Assert.*;
@@ -28,7 +29,7 @@ public class ScriptedQueryFactoryTest {
     @BeforeClass
     public static void setUpClass() throws Exception {
         indexer = new ApplicationSourceIndexer("c:/projects/platypus-tests");
-        resource = BaseModelTest.initDevelopTestClient();
+        resource = new DatabasesClientWithResource(new DbConnectionSettings("jdbc:oracle:thin:@asvr/adb", "eas", "eas", "eas", 1));
     }
 
     @AfterClass
@@ -243,7 +244,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testCompilingWithSubqueries() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("sub_query_compile", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("sub_query_compile", null, null, null);
         assertEquals("/**\n"
                 + " * \n"
                 + " * @author mg\n"
@@ -273,7 +274,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testCompilingWithSubqueriesBad() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("bad_schema", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("bad_schema", null, null, null);
         assertEquals("/**\n"
                 + " * \n"
                 + " * @author mg\n"
@@ -304,7 +305,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testAsteriskMetadata() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("asterisk_schema", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("asterisk_schema", null, null, null);
         assertEquals(""
                 + "/**\n"
                 + " * \n"
@@ -327,7 +328,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testBadSubquery() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("bad_subquery", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("bad_subquery", null, null, null);
         assertEquals("/**\n"
                 + " * \n"
                 + " * @author mg\n"
@@ -340,7 +341,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testPartialTablesAsteriskMetadata() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("partial_asterisk_schema", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("partial_asterisk_schema", null, null, null);
         assertEquals("/**\n"
                 + " * \n"
                 + " * @author mg\n"
@@ -366,7 +367,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testWithoutAliases_Schema_NonSchema_Schema_Columns() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("without_aliases_with_schema_without_schema_columns_from_single_table", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("without_aliases_with_schema_without_schema_columns_from_single_table", null, null, null);
         assertEquals("/**\n"
                 + " * \n"
                 + " * @author mg\n"
@@ -385,7 +386,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testPrimaryKey() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("primary_key", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("primary_key", null, null, null);
         Fields schema = testQuery.getFields();
         assertNotNull(schema);
         assertTrue(schema.getFieldsCount() > 0);
@@ -395,7 +396,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testMultiplePrimaryKeys() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("multiple_primary_keys", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("multiple_primary_keys", null, null, null);
         Fields fields = testQuery.getFields();
         assertNotNull(fields);
         assertTrue(fields.getFieldsCount() == 2);
@@ -406,7 +407,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testMultiplePrimaryKeysWithAsterisk() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("multiple_primary_keys_asterisk", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("multiple_primary_keys_asterisk", null, null, null);
         Fields fields = testQuery.getFields();
         assertNotNull(fields);
         assertTrue(fields.getFieldsCount() == 23);
@@ -423,7 +424,7 @@ public class ScriptedQueryFactoryTest {
     @Test
     public void testGetQuery() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
-        SqlQuery testQuery = queriesProxy.getQuery("get_query", null, null);
+        SqlQuery testQuery = queriesProxy.getQuery("get_query", null, null, null);
         Fields metadata = testQuery.getFields();
         assertEquals(3, metadata.getFieldsCount());
     }
@@ -432,7 +433,7 @@ public class ScriptedQueryFactoryTest {
     public void testGetEmptyQuery() throws Exception {
         LocalQueriesProxy queriesProxy = new LocalQueriesProxy(resource.getClient(), indexer);
         try {
-            SqlQuery testQuery = queriesProxy.getQuery("empty_query", null, null);
+            SqlQuery testQuery = queriesProxy.getQuery("empty_query", null, null, null);
             fail("Empty query must lead to an exception, but it doesn't. Why?");
         } catch (Exception ex) {
             //fine. there muist be an exception

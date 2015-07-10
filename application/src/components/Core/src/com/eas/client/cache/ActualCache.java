@@ -7,19 +7,20 @@ package com.eas.client.cache;
 
 import com.eas.client.AppElementFiles;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Auto updated cache, without shrink.
  *
  * @author mg
+ * @param <E>
  */
 public abstract class ActualCache<E> {
 
-    protected Map<String, ActualCacheEntry<E>> entries = new HashMap<>();
+    protected Map<String, ActualCacheEntry<E>> entries = new ConcurrentHashMap<>();
 
-    public synchronized E get(String aName, AppElementFiles aFiles) throws Exception {
+    public E get(String aName, AppElementFiles aFiles) throws Exception {
         ActualCacheEntry<E> cached = entries.get(aName);
         Date cachedTime = null;
         if (cached != null) {

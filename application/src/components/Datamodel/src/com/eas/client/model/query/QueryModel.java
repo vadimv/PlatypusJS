@@ -4,9 +4,9 @@
  */
 package com.eas.client.model.query;
 
-import com.bearsoft.rowset.metadata.Parameters;
 import com.eas.client.DatabasesClient;
 import com.eas.client.SqlQuery;
+import com.eas.client.metadata.Parameters;
 import com.eas.client.model.Model;
 import com.eas.client.model.Relation;
 import com.eas.client.model.visitors.ModelVisitor;
@@ -173,7 +173,7 @@ public class QueryModel extends Model<QueryEntity, SqlQuery> {
     @Override
     protected boolean validateEntities() throws Exception {
         for (QueryEntity e : entities.values()) {
-            queries.getQuery(e.getQueryName(), null, null);
+            queries.getQuery(e.getQueryName(), null, null, null);
         }
         return super.validateEntities();
     }

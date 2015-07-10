@@ -4,9 +4,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.bearsoft.gwt.ui.widgets.DecoratorBox;
-import com.bearsoft.rowset.Utils;
-import com.bearsoft.rowset.beans.PropertyChangeEvent;
-import com.bearsoft.rowset.beans.PropertyChangeListener;
+import com.eas.client.Utils;
 import com.eas.client.form.ControlsUtils;
 import com.eas.client.form.EventsExecutor;
 import com.eas.client.form.events.HasHideHandlers;
@@ -163,11 +161,15 @@ public abstract class ModelDecoratorBox<T> extends DecoratorBox<T> implements Ha
 		return editable;
 	}
 
+	protected abstract void setReadonly(boolean aValue);
+
+	protected abstract boolean isReadonly();
+
 	@Override
 	public void setEditable(boolean aValue) {
 		if (editable != aValue) {
 			editable = aValue;
-			// target.setReadOnly(!editable || selectOnly);
+			setReadonly(!editable || selectOnly);
 		}
 	}
 
@@ -180,7 +182,7 @@ public abstract class ModelDecoratorBox<T> extends DecoratorBox<T> implements Ha
 	public void setSelectOnly(boolean aValue) {
 		if (selectOnly != aValue) {
 			selectOnly = aValue;
-			// target.setReadOnly(!editable || selectOnly);
+			setReadonly(!editable || selectOnly);
 		}
 	}
 
@@ -257,9 +259,10 @@ public abstract class ModelDecoratorBox<T> extends DecoratorBox<T> implements Ha
 
 	protected void bind() {
 		if (data != null && field != null && !field.isEmpty()) {
-			boundToData = Utils.listen(data, field, new PropertyChangeListener() {
+			boundToData = Utils.listenPath(data, field, new Utils.OnChangeHandler() {
+
 				@Override
-				public void propertyChange(PropertyChangeEvent evt) {
+				public void onChange(JavaScriptObject anEvent) {
 					if (!settingValueToJs) {
 						settingValueFromJs = true;
 						try {
@@ -274,7 +277,6 @@ public abstract class ModelDecoratorBox<T> extends DecoratorBox<T> implements Ha
 						}
 					}
 				}
-
 			});
 			Object oData = Utils.getPathData(data, field);
 			try {

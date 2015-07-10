@@ -1,7 +1,7 @@
 package com.eas.client.form.published.widgets.model;
 
 import com.bearsoft.gwt.ui.widgets.NullableCheckBox;
-import com.bearsoft.rowset.Utils;
+import com.eas.client.Utils;
 import com.eas.client.converters.BooleanValueConverter;
 import com.eas.client.form.events.ActionEvent;
 import com.eas.client.form.events.ActionHandler;
@@ -91,15 +91,12 @@ public class ModelCheck extends ModelDecoratorBox<Boolean> implements HasActionH
 
 	@Override
 	public String getText() {
-		return getValue() != null ? (getValue() ? "true" : "false") : "";
+		return ((NullableCheckBox)decorated).getText();
 	}
 
 	@Override
 	public void setText(String aText) {
-		if (aText == null)
-			setValue(null);
-		else
-			setValue(!aText.isEmpty());
+		((NullableCheckBox)decorated).setText(aText);
 	}
 
 	@Override
@@ -133,5 +130,14 @@ public class ModelCheck extends ModelDecoratorBox<Boolean> implements HasActionH
 	public void setJsValue(Object aValue) throws Exception {
 		Object javaValue = Utils.toJava(aValue);
 		setValue(convert(javaValue), true);
-	}	
+	}
+
+	@Override
+    protected void setReadonly(boolean aValue) {
+    }
+
+	@Override
+    protected boolean isReadonly() {
+	    return false;
+    }	
 }

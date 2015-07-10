@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.client.forms.Anchors");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.client.forms.Anchors";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.Anchors(null, null, null, null, null, null, aDelegate);
     });
     
@@ -28,6 +30,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }

@@ -4,7 +4,7 @@
  */
 package com.eas.client.model.gui.view.model;
 
-import com.bearsoft.rowset.metadata.Field;
+import com.eas.client.metadata.Field;
 import com.eas.client.metadata.TableRef;
 import com.eas.client.model.Entity;
 import com.eas.client.model.Relation;
@@ -91,7 +91,7 @@ public class QueryModelView extends ModelView<QueryEntity, QueryModel> {
             return new QueryParametersEntityView((QueryParametersEntity) aEntity, entitiesViewsMover);
         } else {
             if (aEntity.getQueryName() != null && !aEntity.getQueryName().isEmpty()) {
-                model.getQueries().getQuery(aEntity.getQueryName(), null, null);
+                model.getQueries().getQuery(aEntity.getQueryName(), null, null, null);
             }
             aEntity.validateQuery();
             return new QueryEntityView(aEntity, entitiesViewsMover);

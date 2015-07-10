@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.server.Session");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.server.Session";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.Session(aDelegate);
     });
     
@@ -15,6 +17,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -25,7 +28,7 @@
         Object.defineProperty(this, "modules", {
             get: function() {
                 var value = delegate.modules;
-                return P.boxAsJs(value);
+                return value;
             }
         });
         if(!P.Session){

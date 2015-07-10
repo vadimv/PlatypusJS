@@ -1,6 +1,8 @@
 (function() {
-    var javaClass = Java.type("com.eas.gui.ScriptColor");
-    javaClass.setPublisher(function(aDelegate) {
+    var className = "com.eas.gui.ScriptColor";
+    var javaClass = Java.type(className);
+    var space = this['-platypus-scripts-space'];
+    space.putPublisher(className, function(aDelegate) {
         return new P.Color(null, null, null, null, aDelegate);
     });
     
@@ -22,6 +24,7 @@
             : new javaClass();
 
         Object.defineProperty(this, "unwrap", {
+            configurable: true,
             value: function() {
                 return delegate;
             }
@@ -29,20 +32,6 @@
         if(P.Color.superclass)
             P.Color.superclass.constructor.apply(this, arguments);
         delegate.setPublished(this);
-        Object.defineProperty(this, "GRAY", {
-            get: function() {
-                var value = delegate.GRAY;
-                return P.boxAsJs(value);
-            }
-        });
-        if(!P.Color){
-            /**
-             * Generated property jsDoc.
-             * @property GRAY
-             * @memberOf Color
-             */
-            P.Color.prototype.GRAY = {};
-        }
         Object.defineProperty(this, "WHITE", {
             get: function() {
                 var value = delegate.WHITE;
@@ -56,6 +45,20 @@
              * @memberOf Color
              */
             P.Color.prototype.WHITE = {};
+        }
+        Object.defineProperty(this, "GRAY", {
+            get: function() {
+                var value = delegate.GRAY;
+                return P.boxAsJs(value);
+            }
+        });
+        if(!P.Color){
+            /**
+             * Generated property jsDoc.
+             * @property GRAY
+             * @memberOf Color
+             */
+            P.Color.prototype.GRAY = {};
         }
         Object.defineProperty(this, "BLUE", {
             get: function() {
